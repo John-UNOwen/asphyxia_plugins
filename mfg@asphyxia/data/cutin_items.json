@@ -1,0 +1,3116 @@
+{
+ "_generated_by": "scripts/gen_cutin_item_ids.py",
+ "_source": "recovered Assembly-CSharp CutinItemMaster + MFG.Types.Customize.CutinItem.ItemID",
+ "oid_to_item_id": {
+  "OID_01AgariA01": 1,
+  "OID_01AgariR01": 2,
+  "OID_01AgariSR01": 3,
+  "OID_01AgariSR02": 4,
+  "OID_01AgariSR03": 5,
+  "OID_01AgariUR01": 6,
+  "OID_01NakiA01": 10,
+  "OID_01NakiN01": 11,
+  "OID_01NakiN02": 12,
+  "OID_01NakiN03": 13,
+  "OID_01ReachA01": 7,
+  "OID_01ReachR01": 8,
+  "OID_01ReachR02": 9,
+  "OID_02AgariA01": 14,
+  "OID_02AgariR01": 15,
+  "OID_02AgariSR01": 16,
+  "OID_02AgariSR02": 17,
+  "OID_02AgariSR03": 18,
+  "OID_02AgariSR04": 19,
+  "OID_02AgariUR01": 20,
+  "OID_02NakiA01": 24,
+  "OID_02NakiN01": 25,
+  "OID_02NakiN02": 26,
+  "OID_02NakiN03": 27,
+  "OID_02ReachA01": 21,
+  "OID_02ReachR01": 22,
+  "OID_02ReachR02": 23,
+  "OID_03AgariA01": 28,
+  "OID_03AgariR01": 29,
+  "OID_03AgariSR01": 30,
+  "OID_03AgariSR02": 31,
+  "OID_03AgariSR03": 32,
+  "OID_03AgariUR01": 33,
+  "OID_03NakiA01": 37,
+  "OID_03NakiN01": 38,
+  "OID_03NakiN02": 39,
+  "OID_03NakiN03": 40,
+  "OID_03ReachA01": 34,
+  "OID_03ReachR01": 35,
+  "OID_03ReachR02": 36,
+  "OID_04AgariA01": 41,
+  "OID_04AgariR01": 42,
+  "OID_04AgariSR01": 43,
+  "OID_04AgariSR02": 44,
+  "OID_04AgariSR03": 45,
+  "OID_04AgariUR01": 46,
+  "OID_04NakiA01": 50,
+  "OID_04NakiN01": 51,
+  "OID_04NakiN02": 52,
+  "OID_04NakiN03": 53,
+  "OID_04ReachA01": 47,
+  "OID_04ReachR01": 48,
+  "OID_04ReachR02": 49,
+  "OID_05AgariA01": 54,
+  "OID_05AgariR01": 55,
+  "OID_05AgariSR01": 56,
+  "OID_05AgariSR02": 57,
+  "OID_05AgariSR03": 58,
+  "OID_05AgariUR01": 59,
+  "OID_05NakiA01": 63,
+  "OID_05NakiN01": 64,
+  "OID_05NakiN02": 65,
+  "OID_05NakiN03": 66,
+  "OID_05ReachA01": 60,
+  "OID_05ReachR01": 61,
+  "OID_05ReachR02": 62,
+  "OID_06AgariA01": 67,
+  "OID_06AgariR01": 68,
+  "OID_06AgariSR01": 69,
+  "OID_06AgariSR02": 70,
+  "OID_06AgariSR03": 71,
+  "OID_06AgariSR04": 72,
+  "OID_06AgariUR01": 73,
+  "OID_06NakiA01": 77,
+  "OID_06NakiN01": 78,
+  "OID_06NakiN02": 79,
+  "OID_06NakiN03": 80,
+  "OID_06ReachA01": 74,
+  "OID_06ReachR01": 75,
+  "OID_06ReachR02": 76,
+  "OID_07AgariA01": 81,
+  "OID_07AgariR01": 82,
+  "OID_07AgariSR01": 83,
+  "OID_07AgariSR02": 84,
+  "OID_07AgariSR03": 85,
+  "OID_07AgariUR01": 86,
+  "OID_07NakiA01": 90,
+  "OID_07NakiN01": 91,
+  "OID_07NakiN02": 92,
+  "OID_07NakiN03": 93,
+  "OID_07ReachA01": 87,
+  "OID_07ReachR01": 88,
+  "OID_07ReachR02": 89,
+  "OID_08AgariA01": 94,
+  "OID_08AgariR01": 95,
+  "OID_08AgariSR01": 96,
+  "OID_08AgariSR02": 97,
+  "OID_08AgariSR03": 98,
+  "OID_08AgariUR01": 99,
+  "OID_08NakiA01": 103,
+  "OID_08NakiN01": 104,
+  "OID_08NakiN02": 105,
+  "OID_08NakiN03": 106,
+  "OID_08ReachA01": 100,
+  "OID_08ReachR01": 101,
+  "OID_08ReachR02": 102,
+  "OID_09AgariA01": 107,
+  "OID_09AgariR01": 108,
+  "OID_09AgariSR01": 109,
+  "OID_09AgariSR02": 110,
+  "OID_09AgariSR03": 111,
+  "OID_09AgariUR01": 112,
+  "OID_09NakiA01": 116,
+  "OID_09NakiN01": 117,
+  "OID_09NakiN02": 118,
+  "OID_09NakiN03": 119,
+  "OID_09ReachA01": 113,
+  "OID_09ReachR01": 114,
+  "OID_09ReachR02": 115,
+  "OID_01AgariSR04": 120,
+  "OID_08AgariSR04": 121,
+  "OID_05AgariSR04": 122,
+  "OID_09AgariSR04": 123,
+  "OID_04AgariSR04": 124,
+  "OID_05AgariSR05": 125,
+  "OID_09AgariSR05": 126,
+  "OID_10AgariA01": 127,
+  "OID_10AgariR01": 128,
+  "OID_10AgariSR01": 129,
+  "OID_10AgariSR02": 130,
+  "OID_10AgariSR03": 131,
+  "OID_10AgariUR01": 132,
+  "OID_10NakiA01": 136,
+  "OID_10NakiN01": 137,
+  "OID_10NakiN02": 138,
+  "OID_10NakiN03": 139,
+  "OID_10ReachA01": 133,
+  "OID_10ReachR01": 134,
+  "OID_10ReachR02": 135,
+  "OID_03AgariSR04": 140,
+  "OID_07AgariSR04": 141,
+  "OID_07AgariSR05": 142,
+  "OID_01AgariSR05": 143,
+  "OID_02AgariSR05": 144,
+  "OID_05AgariSR06": 145,
+  "OID_04AgariSR05": 146,
+  "OID_08AgariSR05": 147,
+  "OID_09AgariSR06": 148,
+  "OID_02AgariSR06": 149,
+  "OID_05AgariSR07": 150,
+  "OID_09AgariSR07": 151,
+  "OID_03AgariSR05": 152,
+  "OID_06AgariSR05": 153,
+  "OID_07AgariSR06": 154,
+  "OID_07AgariSR07": 155,
+  "OID_08AgariSR06": 156,
+  "OID_11AgariA01": 157,
+  "OID_11AgariR01": 158,
+  "OID_11AgariSR01": 159,
+  "OID_11AgariSR02": 160,
+  "OID_11AgariSR03": 161,
+  "OID_11AgariSR04": 162,
+  "OID_11AgariUR01": 163,
+  "OID_11NakiA01": 167,
+  "OID_11NakiN01": 168,
+  "OID_11NakiN02": 169,
+  "OID_11NakiN03": 170,
+  "OID_11ReachA01": 164,
+  "OID_11ReachR01": 165,
+  "OID_11ReachR02": 166,
+  "OID_06AgariSR06": 171,
+  "OID_04AgariSR06": 172,
+  "OID_03AgariSR06": 173,
+  "OID_05AgariSR08": 174,
+  "OID_07AgariSR08": 175,
+  "OID_12AgariSR01": 176,
+  "OID_12AgariR01": 177,
+  "OID_12AgariSR02": 178,
+  "OID_12AgariSR03": 179,
+  "OID_12AgariSR04": 180,
+  "OID_12AgariSR05": 181,
+  "OID_12AgariUR01": 182,
+  "OID_12NakiA01": 186,
+  "OID_12NakiN01": 187,
+  "OID_12NakiN02": 188,
+  "OID_12NakiN03": 189,
+  "OID_12ReachA01": 183,
+  "OID_12ReachR01": 184,
+  "OID_12ReachR02": 185,
+  "OID_04AgariSR07": 190,
+  "OID_04AgariSR08": 191,
+  "OID_03AgariSR07": 192,
+  "OID_03AgariSR08": 193,
+  "OID_01AgariSR06": 194,
+  "OID_11AgariSR05": 195,
+  "OID_12AgariSR06": 196,
+  "OID_09AgariSR08": 197,
+  "OID_09AgariSR09": 198,
+  "OID_06AgariSR07": 199,
+  "OID_06AgariSR08": 200,
+  "OID_08AgariSR07": 201,
+  "OID_02AgariSR07": 202,
+  "OID_05AgariSR09": 203,
+  "OID_07AgariSR09": 204,
+  "OID_05AgariSR10": 205,
+  "OID_13AgariSR01": 206,
+  "OID_13AgariR01": 207,
+  "OID_13AgariSR02": 208,
+  "OID_13AgariSR03": 209,
+  "OID_13AgariSR04": 210,
+  "OID_13AgariSR05": 211,
+  "OID_13AgariSR06": 212,
+  "OID_13NakiA01": 216,
+  "OID_13NakiN01": 217,
+  "OID_13NakiN02": 218,
+  "OID_13NakiN03": 219,
+  "OID_13ReachA01": 213,
+  "OID_13ReachR01": 214,
+  "OID_13ReachR02": 215,
+  "OID_01AgariA02": 220,
+  "OID_02AgariA02": 221,
+  "OID_03AgariA02": 222,
+  "OID_04AgariA02": 223,
+  "OID_05AgariA02": 224,
+  "OID_06AgariA02": 225,
+  "OID_07AgariA02": 226,
+  "OID_08AgariA02": 227,
+  "OID_09AgariA02": 228,
+  "OID_10AgariA02": 229,
+  "OID_11AgariA02": 230,
+  "OID_12AgariA01": 231,
+  "OID_01AgariSR07": 232,
+  "OID_04AgariSR09": 233,
+  "OID_12AgariSR07": 234,
+  "OID_02AgariSR08": 235,
+  "OID_05AgariSR11": 236,
+  "OID_06AgariSR09": 237,
+  "OID_07AgariSR10": 238,
+  "OID_09AgariSR10": 239,
+  "OID_02AgariSR09": 240,
+  "OID_02AgariSR10": 241,
+  "OID_03AgariSR09": 242,
+  "OID_03AgariSR10": 243,
+  "OID_02AgariSR11": 244,
+  "OID_09AgariSR11": 245,
+  "OID_09AgariSR12": 246,
+  "OID_14AgariSR01": 247,
+  "OID_14AgariR01": 248,
+  "OID_14AgariSR02": 249,
+  "OID_14AgariSR03": 250,
+  "OID_14AgariSR04": 251,
+  "OID_14AgariSR05": 252,
+  "OID_14AgariSR06": 253,
+  "OID_14NakiA01": 257,
+  "OID_14NakiN01": 258,
+  "OID_14NakiN02": 259,
+  "OID_14NakiN03": 260,
+  "OID_14ReachA01": 254,
+  "OID_14ReachR01": 255,
+  "OID_14ReachR02": 256,
+  "OID_06AgariSR10": 261,
+  "OID_06AgariSR11": 262,
+  "OID_11AgariSR06": 263,
+  "OID_11AgariSR07": 264,
+  "OID_01NakiA02": 265,
+  "OID_02NakiA02": 266,
+  "OID_03NakiA02": 267,
+  "OID_04NakiA02": 268,
+  "OID_05NakiA02": 269,
+  "OID_06NakiA02": 270,
+  "OID_07NakiA02": 271,
+  "OID_08NakiA02": 272,
+  "OID_09NakiA02": 273,
+  "OID_10NakiA02": 274,
+  "OID_11NakiA02": 275,
+  "OID_12NakiA02": 276,
+  "OID_13NakiA02": 277,
+  "OID_14NakiA02": 278,
+  "OID_15AgariSR01": 279,
+  "OID_15AgariR01": 280,
+  "OID_15AgariSR02": 281,
+  "OID_15AgariSR03": 282,
+  "OID_15AgariSR04": 283,
+  "OID_15AgariSR05": 284,
+  "OID_15AgariSR06": 285,
+  "OID_15NakiA01": 289,
+  "OID_15NakiN01": 290,
+  "OID_15NakiN02": 291,
+  "OID_15NakiN03": 292,
+  "OID_15ReachA01": 286,
+  "OID_15ReachR01": 287,
+  "OID_15ReachR02": 288,
+  "OID_13AgariSR07": 293,
+  "OID_13AgariSR08": 294,
+  "OID_04AgariSR10": 295,
+  "OID_08AgariSR08": 296,
+  "OID_08AgariSR09": 297,
+  "OID_05AgariSR12": 298,
+  "OID_05AgariSR13": 299,
+  "OID_07AgariSR11": 300,
+  "OID_04AgariSR11": 301,
+  "OID_04AgariSR12": 302,
+  "OID_07AgariSR12": 303,
+  "OID_07AgariSR13": 304,
+  "OID_16AgariSR01": 305,
+  "OID_16AgariR01": 306,
+  "OID_16AgariSR02": 307,
+  "OID_16AgariSR03": 308,
+  "OID_16AgariSR04": 309,
+  "OID_16AgariSR05": 310,
+  "OID_16AgariSR06": 311,
+  "OID_16NakiA01": 315,
+  "OID_16NakiN01": 316,
+  "OID_16NakiN02": 317,
+  "OID_16NakiN03": 318,
+  "OID_16ReachA01": 312,
+  "OID_16ReachR01": 313,
+  "OID_16ReachR02": 314,
+  "OID_01AgariSR08": 319,
+  "OID_01AgariSR09": 320,
+  "OID_12AgariSR08": 321,
+  "OID_12AgariSR09": 322,
+  "OID_14AgariSR07": 323,
+  "OID_14AgariSR08": 324,
+  "OID_15AgariSR07": 325,
+  "OID_15AgariSR08": 326,
+  "OID_08AgariSR10": 327,
+  "OID_08AgariSR11": 328,
+  "OID_16AgariSR07": 329,
+  "OID_16AgariSR08": 330,
+  "OID_11AgariSR08": 331,
+  "OID_11AgariSR09": 332,
+  "OID_01AgariSR10": 333,
+  "OID_03AgariSR11": 334,
+  "OID_03AgariSR12": 335,
+  "OID_01AgariSR11": 336,
+  "OID_02AgariSR12": 337,
+  "OID_17AgariSR01": 338,
+  "OID_17AgariR01": 339,
+  "OID_17AgariSR02": 340,
+  "OID_17AgariSR03": 341,
+  "OID_17AgariSR04": 342,
+  "OID_17AgariSR05": 343,
+  "OID_17AgariSR06": 344,
+  "OID_17NakiA01": 348,
+  "OID_17NakiN01": 349,
+  "OID_17NakiN02": 350,
+  "OID_17NakiN03": 351,
+  "OID_17ReachA01": 345,
+  "OID_17ReachR01": 346,
+  "OID_17ReachR02": 347,
+  "OID_06AgariSR12": 352,
+  "OID_06AgariSR13": 353,
+  "OID_02AgariSR13": 354,
+  "OID_02AgariSR14": 355,
+  "OID_13AgariSR09": 356,
+  "OID_13AgariSR10": 357,
+  "OID_05AgariSR14": 358,
+  "OID_04AgariA03": 359,
+  "OID_01NakiA03": 360,
+  "OID_02NakiA03": 361,
+  "OID_03NakiA03": 362,
+  "OID_04NakiA03": 363,
+  "OID_05NakiA03": 364,
+  "OID_06NakiA03": 365,
+  "OID_07NakiA03": 366,
+  "OID_08NakiA03": 367,
+  "OID_09NakiA03": 368,
+  "OID_10NakiA03": 369,
+  "OID_11NakiA03": 370,
+  "OID_12NakiA03": 371,
+  "OID_13NakiA03": 372,
+  "OID_14NakiA03": 373,
+  "OID_15NakiA02": 374,
+  "OID_16NakiA02": 375,
+  "OID_17NakiA02": 376,
+  "OID_07AgariSR14": 377,
+  "OID_07AgariSR15": 378,
+  "OID_09AgariSR13": 379,
+  "OID_09AgariSR14": 380,
+  "OID_09AgariSR15": 381,
+  "OID_09AgariSR16": 382,
+  "OID_05AgariSR15": 383,
+  "OID_05AgariSR16": 384,
+  "OID_04AgariSR13": 385,
+  "OID_18AgariSR01": 386,
+  "OID_18AgariR01": 387,
+  "OID_18AgariSR02": 388,
+  "OID_18AgariSR03": 389,
+  "OID_18AgariSR04": 390,
+  "OID_18AgariSR05": 391,
+  "OID_18AgariSR06": 392,
+  "OID_18NakiA01": 396,
+  "OID_18NakiN01": 397,
+  "OID_18NakiN02": 398,
+  "OID_18NakiN03": 399,
+  "OID_18ReachA01": 393,
+  "OID_18ReachR01": 394,
+  "OID_18ReachR02": 395,
+  "OID_04AgariSR14": 400,
+  "OID_04AgariSR15": 401,
+  "OID_16AgariSR09": 402,
+  "OID_16AgariSR10": 403,
+  "OID_07AgariSR16": 404,
+  "OID_13AgariSR11": 405,
+  "OID_07AgariSR17": 406,
+  "OID_13AgariSR12": 407,
+  "OID_17AgariSR07": 408,
+  "OID_17AgariSR08": 409,
+  "OID_08AgariSR12": 410,
+  "OID_19AgariSR01": 411,
+  "OID_19AgariR01": 412,
+  "OID_19AgariSR02": 413,
+  "OID_19AgariSR03": 414,
+  "OID_19AgariSR04": 415,
+  "OID_19AgariSR05": 416,
+  "OID_19AgariSR06": 417,
+  "OID_19NakiA01": 421,
+  "OID_19NakiN01": 422,
+  "OID_19NakiN02": 423,
+  "OID_19NakiN03": 424,
+  "OID_19ReachA01": 418,
+  "OID_19ReachR01": 419,
+  "OID_19ReachR02": 420,
+  "OID_14AgariSR09": 425,
+  "OID_14AgariSR10": 426,
+  "OID_01AgariSR12": 427,
+  "OID_02AgariSR15": 428,
+  "OID_05AgariSR17": 429,
+  "OID_12AgariSR10": 430,
+  "OID_12AgariSR11": 431,
+  "OID_18AgariSR07": 432,
+  "OID_18AgariSR08": 433,
+  "OID_14AgariSR11": 434,
+  "OID_14AgariSR12": 435,
+  "OID_01AgariSR13": 436,
+  "OID_01AgariSR14": 437,
+  "OID_06AgariSR14": 438,
+  "OID_20AgariSR01": 439,
+  "OID_20AgariR01": 440,
+  "OID_20AgariSR02": 441,
+  "OID_20AgariSR03": 442,
+  "OID_20AgariSR04": 443,
+  "OID_20AgariSR05": 444,
+  "OID_20AgariSR06": 445,
+  "OID_20NakiA01": 449,
+  "OID_20NakiN01": 450,
+  "OID_20NakiN02": 451,
+  "OID_20NakiN03": 452,
+  "OID_20ReachA01": 446,
+  "OID_20ReachR01": 447,
+  "OID_20ReachR02": 448,
+  "OID_02AgariSR16": 453,
+  "OID_02AgariSR17": 454,
+  "OID_15AgariSR09": 455,
+  "OID_15AgariSR10": 456,
+  "OID_16AgariSR11": 457,
+  "OID_16AgariSR12": 458,
+  "OID_01AgariSR15": 459,
+  "OID_12AgariSR12": 460,
+  "OID_14AgariSR13": 461,
+  "OID_11AgariSR10": 462,
+  "OID_11AgariSR11": 463,
+  "OID_19AgariSR07": 464,
+  "OID_19AgariSR08": 465,
+  "OID_08AgariSR13": 466,
+  "OID_08AgariSR14": 467,
+  "OID_03AgariSR13": 468,
+  "OID_03AgariSR14": 469,
+  "OID_01NakiA04": 470,
+  "OID_02NakiA04": 471,
+  "OID_03NakiA04": 472,
+  "OID_04NakiA04": 473,
+  "OID_05NakiA04": 474,
+  "OID_06NakiA04": 475,
+  "OID_07NakiA04": 476,
+  "OID_08NakiA04": 477,
+  "OID_09NakiA04": 478,
+  "OID_10NakiA04": 479,
+  "OID_11NakiA04": 480,
+  "OID_12NakiA04": 481,
+  "OID_13NakiA04": 482,
+  "OID_14NakiA04": 483,
+  "OID_15NakiA03": 484,
+  "OID_16NakiA03": 485,
+  "OID_17NakiA03": 486,
+  "OID_18NakiA02": 487,
+  "OID_19NakiA02": 488,
+  "OID_20NakiA02": 489,
+  "OID_07AgariSR18": 490,
+  "OID_16AgariSR13": 491,
+  "OID_16AgariSR14": 492,
+  "OID_21AgariSR01": 493,
+  "OID_21AgariR01": 494,
+  "OID_21AgariSR02": 495,
+  "OID_21AgariSR03": 496,
+  "OID_21AgariSR04": 497,
+  "OID_21AgariSR05": 498,
+  "OID_21AgariSR06": 499,
+  "OID_21NakiA01": 503,
+  "OID_21NakiN01": 504,
+  "OID_21NakiN02": 505,
+  "OID_21NakiN03": 506,
+  "OID_21ReachA01": 500,
+  "OID_21ReachR01": 501,
+  "OID_21ReachR02": 502,
+  "OID_20AgariSR07": 507,
+  "OID_20AgariSR08": 508,
+  "OID_21NakiA02": 509
+ },
+ "oid_info": {
+  "OID_01AgariA01": {
+   "item_id": 1,
+   "rarity": "Nothing",
+   "chara": 0
+  },
+  "OID_01AgariR01": {
+   "item_id": 2,
+   "rarity": "R",
+   "chara": 0
+  },
+  "OID_01AgariSR01": {
+   "item_id": 3,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_01AgariSR02": {
+   "item_id": 4,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_01AgariSR03": {
+   "item_id": 5,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_01AgariUR01": {
+   "item_id": 6,
+   "rarity": "UR",
+   "chara": 0
+  },
+  "OID_01NakiA01": {
+   "item_id": 10,
+   "rarity": "Nothing",
+   "chara": 0
+  },
+  "OID_01NakiN01": {
+   "item_id": 11,
+   "rarity": "N",
+   "chara": 0
+  },
+  "OID_01NakiN02": {
+   "item_id": 12,
+   "rarity": "N",
+   "chara": 0
+  },
+  "OID_01NakiN03": {
+   "item_id": 13,
+   "rarity": "N",
+   "chara": 0
+  },
+  "OID_01ReachA01": {
+   "item_id": 7,
+   "rarity": "Nothing",
+   "chara": 0
+  },
+  "OID_01ReachR01": {
+   "item_id": 8,
+   "rarity": "R",
+   "chara": 0
+  },
+  "OID_01ReachR02": {
+   "item_id": 9,
+   "rarity": "R",
+   "chara": 0
+  },
+  "OID_02AgariA01": {
+   "item_id": 14,
+   "rarity": "Nothing",
+   "chara": 1
+  },
+  "OID_02AgariR01": {
+   "item_id": 15,
+   "rarity": "R",
+   "chara": 1
+  },
+  "OID_02AgariSR01": {
+   "item_id": 16,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_02AgariSR02": {
+   "item_id": 17,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_02AgariSR03": {
+   "item_id": 18,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_02AgariSR04": {
+   "item_id": 19,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_02AgariUR01": {
+   "item_id": 20,
+   "rarity": "UR",
+   "chara": 1
+  },
+  "OID_02NakiA01": {
+   "item_id": 24,
+   "rarity": "Nothing",
+   "chara": 1
+  },
+  "OID_02NakiN01": {
+   "item_id": 25,
+   "rarity": "N",
+   "chara": 1
+  },
+  "OID_02NakiN02": {
+   "item_id": 26,
+   "rarity": "N",
+   "chara": 1
+  },
+  "OID_02NakiN03": {
+   "item_id": 27,
+   "rarity": "N",
+   "chara": 1
+  },
+  "OID_02ReachA01": {
+   "item_id": 21,
+   "rarity": "Nothing",
+   "chara": 1
+  },
+  "OID_02ReachR01": {
+   "item_id": 22,
+   "rarity": "R",
+   "chara": 1
+  },
+  "OID_02ReachR02": {
+   "item_id": 23,
+   "rarity": "R",
+   "chara": 1
+  },
+  "OID_03AgariA01": {
+   "item_id": 28,
+   "rarity": "Nothing",
+   "chara": 2
+  },
+  "OID_03AgariR01": {
+   "item_id": 29,
+   "rarity": "R",
+   "chara": 2
+  },
+  "OID_03AgariSR01": {
+   "item_id": 30,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_03AgariSR02": {
+   "item_id": 31,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_03AgariSR03": {
+   "item_id": 32,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_03AgariUR01": {
+   "item_id": 33,
+   "rarity": "UR",
+   "chara": 2
+  },
+  "OID_03NakiA01": {
+   "item_id": 37,
+   "rarity": "Nothing",
+   "chara": 2
+  },
+  "OID_03NakiN01": {
+   "item_id": 38,
+   "rarity": "N",
+   "chara": 2
+  },
+  "OID_03NakiN02": {
+   "item_id": 39,
+   "rarity": "N",
+   "chara": 2
+  },
+  "OID_03NakiN03": {
+   "item_id": 40,
+   "rarity": "N",
+   "chara": 2
+  },
+  "OID_03ReachA01": {
+   "item_id": 34,
+   "rarity": "Nothing",
+   "chara": 2
+  },
+  "OID_03ReachR01": {
+   "item_id": 35,
+   "rarity": "R",
+   "chara": 2
+  },
+  "OID_03ReachR02": {
+   "item_id": 36,
+   "rarity": "R",
+   "chara": 2
+  },
+  "OID_04AgariA01": {
+   "item_id": 41,
+   "rarity": "Nothing",
+   "chara": 3
+  },
+  "OID_04AgariR01": {
+   "item_id": 42,
+   "rarity": "R",
+   "chara": 3
+  },
+  "OID_04AgariSR01": {
+   "item_id": 43,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_04AgariSR02": {
+   "item_id": 44,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_04AgariSR03": {
+   "item_id": 45,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_04AgariUR01": {
+   "item_id": 46,
+   "rarity": "UR",
+   "chara": 3
+  },
+  "OID_04NakiA01": {
+   "item_id": 50,
+   "rarity": "Nothing",
+   "chara": 3
+  },
+  "OID_04NakiN01": {
+   "item_id": 51,
+   "rarity": "N",
+   "chara": 3
+  },
+  "OID_04NakiN02": {
+   "item_id": 52,
+   "rarity": "N",
+   "chara": 3
+  },
+  "OID_04NakiN03": {
+   "item_id": 53,
+   "rarity": "N",
+   "chara": 3
+  },
+  "OID_04ReachA01": {
+   "item_id": 47,
+   "rarity": "Nothing",
+   "chara": 3
+  },
+  "OID_04ReachR01": {
+   "item_id": 48,
+   "rarity": "R",
+   "chara": 3
+  },
+  "OID_04ReachR02": {
+   "item_id": 49,
+   "rarity": "R",
+   "chara": 3
+  },
+  "OID_05AgariA01": {
+   "item_id": 54,
+   "rarity": "Nothing",
+   "chara": 4
+  },
+  "OID_05AgariR01": {
+   "item_id": 55,
+   "rarity": "R",
+   "chara": 4
+  },
+  "OID_05AgariSR01": {
+   "item_id": 56,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_05AgariSR02": {
+   "item_id": 57,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_05AgariSR03": {
+   "item_id": 58,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_05AgariUR01": {
+   "item_id": 59,
+   "rarity": "UR",
+   "chara": 4
+  },
+  "OID_05NakiA01": {
+   "item_id": 63,
+   "rarity": "Nothing",
+   "chara": 4
+  },
+  "OID_05NakiN01": {
+   "item_id": 64,
+   "rarity": "N",
+   "chara": 4
+  },
+  "OID_05NakiN02": {
+   "item_id": 65,
+   "rarity": "N",
+   "chara": 4
+  },
+  "OID_05NakiN03": {
+   "item_id": 66,
+   "rarity": "N",
+   "chara": 4
+  },
+  "OID_05ReachA01": {
+   "item_id": 60,
+   "rarity": "Nothing",
+   "chara": 4
+  },
+  "OID_05ReachR01": {
+   "item_id": 61,
+   "rarity": "R",
+   "chara": 4
+  },
+  "OID_05ReachR02": {
+   "item_id": 62,
+   "rarity": "R",
+   "chara": 4
+  },
+  "OID_06AgariA01": {
+   "item_id": 67,
+   "rarity": "Nothing",
+   "chara": 5
+  },
+  "OID_06AgariR01": {
+   "item_id": 68,
+   "rarity": "R",
+   "chara": 5
+  },
+  "OID_06AgariSR01": {
+   "item_id": 69,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_06AgariSR02": {
+   "item_id": 70,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_06AgariSR03": {
+   "item_id": 71,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_06AgariSR04": {
+   "item_id": 72,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_06AgariUR01": {
+   "item_id": 73,
+   "rarity": "UR",
+   "chara": 5
+  },
+  "OID_06NakiA01": {
+   "item_id": 77,
+   "rarity": "Nothing",
+   "chara": 5
+  },
+  "OID_06NakiN01": {
+   "item_id": 78,
+   "rarity": "N",
+   "chara": 5
+  },
+  "OID_06NakiN02": {
+   "item_id": 79,
+   "rarity": "N",
+   "chara": 5
+  },
+  "OID_06NakiN03": {
+   "item_id": 80,
+   "rarity": "N",
+   "chara": 5
+  },
+  "OID_06ReachA01": {
+   "item_id": 74,
+   "rarity": "Nothing",
+   "chara": 5
+  },
+  "OID_06ReachR01": {
+   "item_id": 75,
+   "rarity": "R",
+   "chara": 5
+  },
+  "OID_06ReachR02": {
+   "item_id": 76,
+   "rarity": "R",
+   "chara": 5
+  },
+  "OID_07AgariA01": {
+   "item_id": 81,
+   "rarity": "Nothing",
+   "chara": 6
+  },
+  "OID_07AgariR01": {
+   "item_id": 82,
+   "rarity": "R",
+   "chara": 6
+  },
+  "OID_07AgariSR01": {
+   "item_id": 83,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_07AgariSR02": {
+   "item_id": 84,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_07AgariSR03": {
+   "item_id": 85,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_07AgariUR01": {
+   "item_id": 86,
+   "rarity": "UR",
+   "chara": 6
+  },
+  "OID_07NakiA01": {
+   "item_id": 90,
+   "rarity": "Nothing",
+   "chara": 6
+  },
+  "OID_07NakiN01": {
+   "item_id": 91,
+   "rarity": "N",
+   "chara": 6
+  },
+  "OID_07NakiN02": {
+   "item_id": 92,
+   "rarity": "N",
+   "chara": 6
+  },
+  "OID_07NakiN03": {
+   "item_id": 93,
+   "rarity": "N",
+   "chara": 6
+  },
+  "OID_07ReachA01": {
+   "item_id": 87,
+   "rarity": "Nothing",
+   "chara": 6
+  },
+  "OID_07ReachR01": {
+   "item_id": 88,
+   "rarity": "R",
+   "chara": 6
+  },
+  "OID_07ReachR02": {
+   "item_id": 89,
+   "rarity": "R",
+   "chara": 6
+  },
+  "OID_08AgariA01": {
+   "item_id": 94,
+   "rarity": "Nothing",
+   "chara": 7
+  },
+  "OID_08AgariR01": {
+   "item_id": 95,
+   "rarity": "R",
+   "chara": 7
+  },
+  "OID_08AgariSR01": {
+   "item_id": 96,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_08AgariSR02": {
+   "item_id": 97,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_08AgariSR03": {
+   "item_id": 98,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_08AgariUR01": {
+   "item_id": 99,
+   "rarity": "UR",
+   "chara": 7
+  },
+  "OID_08NakiA01": {
+   "item_id": 103,
+   "rarity": "Nothing",
+   "chara": 7
+  },
+  "OID_08NakiN01": {
+   "item_id": 104,
+   "rarity": "N",
+   "chara": 7
+  },
+  "OID_08NakiN02": {
+   "item_id": 105,
+   "rarity": "N",
+   "chara": 7
+  },
+  "OID_08NakiN03": {
+   "item_id": 106,
+   "rarity": "N",
+   "chara": 7
+  },
+  "OID_08ReachA01": {
+   "item_id": 100,
+   "rarity": "Nothing",
+   "chara": 7
+  },
+  "OID_08ReachR01": {
+   "item_id": 101,
+   "rarity": "R",
+   "chara": 7
+  },
+  "OID_08ReachR02": {
+   "item_id": 102,
+   "rarity": "R",
+   "chara": 7
+  },
+  "OID_09AgariA01": {
+   "item_id": 107,
+   "rarity": "Nothing",
+   "chara": 8
+  },
+  "OID_09AgariR01": {
+   "item_id": 108,
+   "rarity": "R",
+   "chara": 8
+  },
+  "OID_09AgariSR01": {
+   "item_id": 109,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_09AgariSR02": {
+   "item_id": 110,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_09AgariSR03": {
+   "item_id": 111,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_09AgariUR01": {
+   "item_id": 112,
+   "rarity": "UR",
+   "chara": 8
+  },
+  "OID_09NakiA01": {
+   "item_id": 116,
+   "rarity": "Nothing",
+   "chara": 8
+  },
+  "OID_09NakiN01": {
+   "item_id": 117,
+   "rarity": "N",
+   "chara": 8
+  },
+  "OID_09NakiN02": {
+   "item_id": 118,
+   "rarity": "N",
+   "chara": 8
+  },
+  "OID_09NakiN03": {
+   "item_id": 119,
+   "rarity": "N",
+   "chara": 8
+  },
+  "OID_09ReachA01": {
+   "item_id": 113,
+   "rarity": "Nothing",
+   "chara": 8
+  },
+  "OID_09ReachR01": {
+   "item_id": 114,
+   "rarity": "R",
+   "chara": 8
+  },
+  "OID_09ReachR02": {
+   "item_id": 115,
+   "rarity": "R",
+   "chara": 8
+  },
+  "OID_01AgariSR04": {
+   "item_id": 120,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_08AgariSR04": {
+   "item_id": 121,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_05AgariSR04": {
+   "item_id": 122,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_09AgariSR04": {
+   "item_id": 123,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_04AgariSR04": {
+   "item_id": 124,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_05AgariSR05": {
+   "item_id": 125,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_09AgariSR05": {
+   "item_id": 126,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_10AgariA01": {
+   "item_id": 127,
+   "rarity": "Nothing",
+   "chara": 9
+  },
+  "OID_10AgariR01": {
+   "item_id": 128,
+   "rarity": "R",
+   "chara": 9
+  },
+  "OID_10AgariSR01": {
+   "item_id": 129,
+   "rarity": "SR",
+   "chara": 9
+  },
+  "OID_10AgariSR02": {
+   "item_id": 130,
+   "rarity": "SR",
+   "chara": 9
+  },
+  "OID_10AgariSR03": {
+   "item_id": 131,
+   "rarity": "SR",
+   "chara": 9
+  },
+  "OID_10AgariUR01": {
+   "item_id": 132,
+   "rarity": "UR",
+   "chara": 9
+  },
+  "OID_10NakiA01": {
+   "item_id": 136,
+   "rarity": "Nothing",
+   "chara": 9
+  },
+  "OID_10NakiN01": {
+   "item_id": 137,
+   "rarity": "N",
+   "chara": 9
+  },
+  "OID_10NakiN02": {
+   "item_id": 138,
+   "rarity": "N",
+   "chara": 9
+  },
+  "OID_10NakiN03": {
+   "item_id": 139,
+   "rarity": "N",
+   "chara": 9
+  },
+  "OID_10ReachA01": {
+   "item_id": 133,
+   "rarity": "Nothing",
+   "chara": 9
+  },
+  "OID_10ReachR01": {
+   "item_id": 134,
+   "rarity": "R",
+   "chara": 9
+  },
+  "OID_10ReachR02": {
+   "item_id": 135,
+   "rarity": "R",
+   "chara": 9
+  },
+  "OID_03AgariSR04": {
+   "item_id": 140,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_07AgariSR04": {
+   "item_id": 141,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_07AgariSR05": {
+   "item_id": 142,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_01AgariSR05": {
+   "item_id": 143,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_02AgariSR05": {
+   "item_id": 144,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_05AgariSR06": {
+   "item_id": 145,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_04AgariSR05": {
+   "item_id": 146,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_08AgariSR05": {
+   "item_id": 147,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_09AgariSR06": {
+   "item_id": 148,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_02AgariSR06": {
+   "item_id": 149,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_05AgariSR07": {
+   "item_id": 150,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_09AgariSR07": {
+   "item_id": 151,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_03AgariSR05": {
+   "item_id": 152,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_06AgariSR05": {
+   "item_id": 153,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_07AgariSR06": {
+   "item_id": 154,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_07AgariSR07": {
+   "item_id": 155,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_08AgariSR06": {
+   "item_id": 156,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_11AgariA01": {
+   "item_id": 157,
+   "rarity": "Nothing",
+   "chara": 10
+  },
+  "OID_11AgariR01": {
+   "item_id": 158,
+   "rarity": "R",
+   "chara": 10
+  },
+  "OID_11AgariSR01": {
+   "item_id": 159,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_11AgariSR02": {
+   "item_id": 160,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_11AgariSR03": {
+   "item_id": 161,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_11AgariSR04": {
+   "item_id": 162,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_11AgariUR01": {
+   "item_id": 163,
+   "rarity": "UR",
+   "chara": 10
+  },
+  "OID_11NakiA01": {
+   "item_id": 167,
+   "rarity": "Nothing",
+   "chara": 10
+  },
+  "OID_11NakiN01": {
+   "item_id": 168,
+   "rarity": "N",
+   "chara": 10
+  },
+  "OID_11NakiN02": {
+   "item_id": 169,
+   "rarity": "N",
+   "chara": 10
+  },
+  "OID_11NakiN03": {
+   "item_id": 170,
+   "rarity": "N",
+   "chara": 10
+  },
+  "OID_11ReachA01": {
+   "item_id": 164,
+   "rarity": "Nothing",
+   "chara": 10
+  },
+  "OID_11ReachR01": {
+   "item_id": 165,
+   "rarity": "R",
+   "chara": 10
+  },
+  "OID_11ReachR02": {
+   "item_id": 166,
+   "rarity": "R",
+   "chara": 10
+  },
+  "OID_06AgariSR06": {
+   "item_id": 171,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_04AgariSR06": {
+   "item_id": 172,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_03AgariSR06": {
+   "item_id": 173,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_05AgariSR08": {
+   "item_id": 174,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_07AgariSR08": {
+   "item_id": 175,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_12AgariSR01": {
+   "item_id": 176,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_12AgariR01": {
+   "item_id": 177,
+   "rarity": "R",
+   "chara": 11
+  },
+  "OID_12AgariSR02": {
+   "item_id": 178,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_12AgariSR03": {
+   "item_id": 179,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_12AgariSR04": {
+   "item_id": 180,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_12AgariSR05": {
+   "item_id": 181,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_12AgariUR01": {
+   "item_id": 182,
+   "rarity": "UR",
+   "chara": 11
+  },
+  "OID_12NakiA01": {
+   "item_id": 186,
+   "rarity": "Nothing",
+   "chara": 11
+  },
+  "OID_12NakiN01": {
+   "item_id": 187,
+   "rarity": "N",
+   "chara": 11
+  },
+  "OID_12NakiN02": {
+   "item_id": 188,
+   "rarity": "N",
+   "chara": 11
+  },
+  "OID_12NakiN03": {
+   "item_id": 189,
+   "rarity": "N",
+   "chara": 11
+  },
+  "OID_12ReachA01": {
+   "item_id": 183,
+   "rarity": "Nothing",
+   "chara": 11
+  },
+  "OID_12ReachR01": {
+   "item_id": 184,
+   "rarity": "R",
+   "chara": 11
+  },
+  "OID_12ReachR02": {
+   "item_id": 185,
+   "rarity": "R",
+   "chara": 11
+  },
+  "OID_04AgariSR07": {
+   "item_id": 190,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_04AgariSR08": {
+   "item_id": 191,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_03AgariSR07": {
+   "item_id": 192,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_03AgariSR08": {
+   "item_id": 193,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_01AgariSR06": {
+   "item_id": 194,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_11AgariSR05": {
+   "item_id": 195,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_12AgariSR06": {
+   "item_id": 196,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_09AgariSR08": {
+   "item_id": 197,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_09AgariSR09": {
+   "item_id": 198,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_06AgariSR07": {
+   "item_id": 199,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_06AgariSR08": {
+   "item_id": 200,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_08AgariSR07": {
+   "item_id": 201,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_02AgariSR07": {
+   "item_id": 202,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_05AgariSR09": {
+   "item_id": 203,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_07AgariSR09": {
+   "item_id": 204,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_05AgariSR10": {
+   "item_id": 205,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_13AgariSR01": {
+   "item_id": 206,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_13AgariR01": {
+   "item_id": 207,
+   "rarity": "R",
+   "chara": 12
+  },
+  "OID_13AgariSR02": {
+   "item_id": 208,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_13AgariSR03": {
+   "item_id": 209,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_13AgariSR04": {
+   "item_id": 210,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_13AgariSR05": {
+   "item_id": 211,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_13AgariSR06": {
+   "item_id": 212,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_13NakiA01": {
+   "item_id": 216,
+   "rarity": "Nothing",
+   "chara": 12
+  },
+  "OID_13NakiN01": {
+   "item_id": 217,
+   "rarity": "N",
+   "chara": 12
+  },
+  "OID_13NakiN02": {
+   "item_id": 218,
+   "rarity": "N",
+   "chara": 12
+  },
+  "OID_13NakiN03": {
+   "item_id": 219,
+   "rarity": "N",
+   "chara": 12
+  },
+  "OID_13ReachA01": {
+   "item_id": 213,
+   "rarity": "Nothing",
+   "chara": 12
+  },
+  "OID_13ReachR01": {
+   "item_id": 214,
+   "rarity": "R",
+   "chara": 12
+  },
+  "OID_13ReachR02": {
+   "item_id": 215,
+   "rarity": "R",
+   "chara": 12
+  },
+  "OID_01AgariA02": {
+   "item_id": 220,
+   "rarity": "Nothing",
+   "chara": 0
+  },
+  "OID_02AgariA02": {
+   "item_id": 221,
+   "rarity": "Nothing",
+   "chara": 1
+  },
+  "OID_03AgariA02": {
+   "item_id": 222,
+   "rarity": "Nothing",
+   "chara": 2
+  },
+  "OID_04AgariA02": {
+   "item_id": 223,
+   "rarity": "Nothing",
+   "chara": 3
+  },
+  "OID_05AgariA02": {
+   "item_id": 224,
+   "rarity": "Nothing",
+   "chara": 4
+  },
+  "OID_06AgariA02": {
+   "item_id": 225,
+   "rarity": "Nothing",
+   "chara": 5
+  },
+  "OID_07AgariA02": {
+   "item_id": 226,
+   "rarity": "Nothing",
+   "chara": 6
+  },
+  "OID_08AgariA02": {
+   "item_id": 227,
+   "rarity": "Nothing",
+   "chara": 7
+  },
+  "OID_09AgariA02": {
+   "item_id": 228,
+   "rarity": "Nothing",
+   "chara": 8
+  },
+  "OID_10AgariA02": {
+   "item_id": 229,
+   "rarity": "Nothing",
+   "chara": 9
+  },
+  "OID_11AgariA02": {
+   "item_id": 230,
+   "rarity": "Nothing",
+   "chara": 10
+  },
+  "OID_12AgariA01": {
+   "item_id": 231,
+   "rarity": "Nothing",
+   "chara": 11
+  },
+  "OID_01AgariSR07": {
+   "item_id": 232,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_04AgariSR09": {
+   "item_id": 233,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_12AgariSR07": {
+   "item_id": 234,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_02AgariSR08": {
+   "item_id": 235,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_05AgariSR11": {
+   "item_id": 236,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_06AgariSR09": {
+   "item_id": 237,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_07AgariSR10": {
+   "item_id": 238,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_09AgariSR10": {
+   "item_id": 239,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_02AgariSR09": {
+   "item_id": 240,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_02AgariSR10": {
+   "item_id": 241,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_03AgariSR09": {
+   "item_id": 242,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_03AgariSR10": {
+   "item_id": 243,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_02AgariSR11": {
+   "item_id": 244,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_09AgariSR11": {
+   "item_id": 245,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_09AgariSR12": {
+   "item_id": 246,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_14AgariSR01": {
+   "item_id": 247,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14AgariR01": {
+   "item_id": 248,
+   "rarity": "R",
+   "chara": 13
+  },
+  "OID_14AgariSR02": {
+   "item_id": 249,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14AgariSR03": {
+   "item_id": 250,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14AgariSR04": {
+   "item_id": 251,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14AgariSR05": {
+   "item_id": 252,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14AgariSR06": {
+   "item_id": 253,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14NakiA01": {
+   "item_id": 257,
+   "rarity": "Nothing",
+   "chara": 13
+  },
+  "OID_14NakiN01": {
+   "item_id": 258,
+   "rarity": "N",
+   "chara": 13
+  },
+  "OID_14NakiN02": {
+   "item_id": 259,
+   "rarity": "N",
+   "chara": 13
+  },
+  "OID_14NakiN03": {
+   "item_id": 260,
+   "rarity": "N",
+   "chara": 13
+  },
+  "OID_14ReachA01": {
+   "item_id": 254,
+   "rarity": "Nothing",
+   "chara": 13
+  },
+  "OID_14ReachR01": {
+   "item_id": 255,
+   "rarity": "R",
+   "chara": 13
+  },
+  "OID_14ReachR02": {
+   "item_id": 256,
+   "rarity": "R",
+   "chara": 13
+  },
+  "OID_06AgariSR10": {
+   "item_id": 261,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_06AgariSR11": {
+   "item_id": 262,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_11AgariSR06": {
+   "item_id": 263,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_11AgariSR07": {
+   "item_id": 264,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_01NakiA02": {
+   "item_id": 265,
+   "rarity": "Nothing",
+   "chara": 0
+  },
+  "OID_02NakiA02": {
+   "item_id": 266,
+   "rarity": "Nothing",
+   "chara": 1
+  },
+  "OID_03NakiA02": {
+   "item_id": 267,
+   "rarity": "Nothing",
+   "chara": 2
+  },
+  "OID_04NakiA02": {
+   "item_id": 268,
+   "rarity": "Nothing",
+   "chara": 3
+  },
+  "OID_05NakiA02": {
+   "item_id": 269,
+   "rarity": "Nothing",
+   "chara": 4
+  },
+  "OID_06NakiA02": {
+   "item_id": 270,
+   "rarity": "Nothing",
+   "chara": 5
+  },
+  "OID_07NakiA02": {
+   "item_id": 271,
+   "rarity": "Nothing",
+   "chara": 6
+  },
+  "OID_08NakiA02": {
+   "item_id": 272,
+   "rarity": "Nothing",
+   "chara": 7
+  },
+  "OID_09NakiA02": {
+   "item_id": 273,
+   "rarity": "Nothing",
+   "chara": 8
+  },
+  "OID_10NakiA02": {
+   "item_id": 274,
+   "rarity": "Nothing",
+   "chara": 9
+  },
+  "OID_11NakiA02": {
+   "item_id": 275,
+   "rarity": "Nothing",
+   "chara": 10
+  },
+  "OID_12NakiA02": {
+   "item_id": 276,
+   "rarity": "Nothing",
+   "chara": 11
+  },
+  "OID_13NakiA02": {
+   "item_id": 277,
+   "rarity": "Nothing",
+   "chara": 12
+  },
+  "OID_14NakiA02": {
+   "item_id": 278,
+   "rarity": "Nothing",
+   "chara": 13
+  },
+  "OID_15AgariSR01": {
+   "item_id": 279,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_15AgariR01": {
+   "item_id": 280,
+   "rarity": "R",
+   "chara": 14
+  },
+  "OID_15AgariSR02": {
+   "item_id": 281,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_15AgariSR03": {
+   "item_id": 282,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_15AgariSR04": {
+   "item_id": 283,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_15AgariSR05": {
+   "item_id": 284,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_15AgariSR06": {
+   "item_id": 285,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_15NakiA01": {
+   "item_id": 289,
+   "rarity": "Nothing",
+   "chara": 14
+  },
+  "OID_15NakiN01": {
+   "item_id": 290,
+   "rarity": "N",
+   "chara": 14
+  },
+  "OID_15NakiN02": {
+   "item_id": 291,
+   "rarity": "N",
+   "chara": 14
+  },
+  "OID_15NakiN03": {
+   "item_id": 292,
+   "rarity": "N",
+   "chara": 14
+  },
+  "OID_15ReachA01": {
+   "item_id": 286,
+   "rarity": "Nothing",
+   "chara": 14
+  },
+  "OID_15ReachR01": {
+   "item_id": 287,
+   "rarity": "R",
+   "chara": 14
+  },
+  "OID_15ReachR02": {
+   "item_id": 288,
+   "rarity": "R",
+   "chara": 14
+  },
+  "OID_13AgariSR07": {
+   "item_id": 293,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_13AgariSR08": {
+   "item_id": 294,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_04AgariSR10": {
+   "item_id": 295,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_08AgariSR08": {
+   "item_id": 296,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_08AgariSR09": {
+   "item_id": 297,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_05AgariSR12": {
+   "item_id": 298,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_05AgariSR13": {
+   "item_id": 299,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_07AgariSR11": {
+   "item_id": 300,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_04AgariSR11": {
+   "item_id": 301,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_04AgariSR12": {
+   "item_id": 302,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_07AgariSR12": {
+   "item_id": 303,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_07AgariSR13": {
+   "item_id": 304,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_16AgariSR01": {
+   "item_id": 305,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariR01": {
+   "item_id": 306,
+   "rarity": "R",
+   "chara": 15
+  },
+  "OID_16AgariSR02": {
+   "item_id": 307,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariSR03": {
+   "item_id": 308,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariSR04": {
+   "item_id": 309,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariSR05": {
+   "item_id": 310,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariSR06": {
+   "item_id": 311,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16NakiA01": {
+   "item_id": 315,
+   "rarity": "Nothing",
+   "chara": 15
+  },
+  "OID_16NakiN01": {
+   "item_id": 316,
+   "rarity": "N",
+   "chara": 15
+  },
+  "OID_16NakiN02": {
+   "item_id": 317,
+   "rarity": "N",
+   "chara": 15
+  },
+  "OID_16NakiN03": {
+   "item_id": 318,
+   "rarity": "N",
+   "chara": 15
+  },
+  "OID_16ReachA01": {
+   "item_id": 312,
+   "rarity": "Nothing",
+   "chara": 15
+  },
+  "OID_16ReachR01": {
+   "item_id": 313,
+   "rarity": "R",
+   "chara": 15
+  },
+  "OID_16ReachR02": {
+   "item_id": 314,
+   "rarity": "R",
+   "chara": 15
+  },
+  "OID_01AgariSR08": {
+   "item_id": 319,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_01AgariSR09": {
+   "item_id": 320,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_12AgariSR08": {
+   "item_id": 321,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_12AgariSR09": {
+   "item_id": 322,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_14AgariSR07": {
+   "item_id": 323,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14AgariSR08": {
+   "item_id": 324,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_15AgariSR07": {
+   "item_id": 325,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_15AgariSR08": {
+   "item_id": 326,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_08AgariSR10": {
+   "item_id": 327,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_08AgariSR11": {
+   "item_id": 328,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_16AgariSR07": {
+   "item_id": 329,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariSR08": {
+   "item_id": 330,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_11AgariSR08": {
+   "item_id": 331,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_11AgariSR09": {
+   "item_id": 332,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_01AgariSR10": {
+   "item_id": 333,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_03AgariSR11": {
+   "item_id": 334,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_03AgariSR12": {
+   "item_id": 335,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_01AgariSR11": {
+   "item_id": 336,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_02AgariSR12": {
+   "item_id": 337,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_17AgariSR01": {
+   "item_id": 338,
+   "rarity": "SR",
+   "chara": 16
+  },
+  "OID_17AgariR01": {
+   "item_id": 339,
+   "rarity": "R",
+   "chara": 16
+  },
+  "OID_17AgariSR02": {
+   "item_id": 340,
+   "rarity": "SR",
+   "chara": 16
+  },
+  "OID_17AgariSR03": {
+   "item_id": 341,
+   "rarity": "SR",
+   "chara": 16
+  },
+  "OID_17AgariSR04": {
+   "item_id": 342,
+   "rarity": "SR",
+   "chara": 16
+  },
+  "OID_17AgariSR05": {
+   "item_id": 343,
+   "rarity": "SR",
+   "chara": 16
+  },
+  "OID_17AgariSR06": {
+   "item_id": 344,
+   "rarity": "SR",
+   "chara": 16
+  },
+  "OID_17NakiA01": {
+   "item_id": 348,
+   "rarity": "Nothing",
+   "chara": 16
+  },
+  "OID_17NakiN01": {
+   "item_id": 349,
+   "rarity": "N",
+   "chara": 16
+  },
+  "OID_17NakiN02": {
+   "item_id": 350,
+   "rarity": "N",
+   "chara": 16
+  },
+  "OID_17NakiN03": {
+   "item_id": 351,
+   "rarity": "N",
+   "chara": 16
+  },
+  "OID_17ReachA01": {
+   "item_id": 345,
+   "rarity": "Nothing",
+   "chara": 16
+  },
+  "OID_17ReachR01": {
+   "item_id": 346,
+   "rarity": "R",
+   "chara": 16
+  },
+  "OID_17ReachR02": {
+   "item_id": 347,
+   "rarity": "R",
+   "chara": 16
+  },
+  "OID_06AgariSR12": {
+   "item_id": 352,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_06AgariSR13": {
+   "item_id": 353,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_02AgariSR13": {
+   "item_id": 354,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_02AgariSR14": {
+   "item_id": 355,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_13AgariSR09": {
+   "item_id": 356,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_13AgariSR10": {
+   "item_id": 357,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_05AgariSR14": {
+   "item_id": 358,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_04AgariA03": {
+   "item_id": 359,
+   "rarity": "Nothing",
+   "chara": 3
+  },
+  "OID_01NakiA03": {
+   "item_id": 360,
+   "rarity": "Nothing",
+   "chara": 0
+  },
+  "OID_02NakiA03": {
+   "item_id": 361,
+   "rarity": "Nothing",
+   "chara": 1
+  },
+  "OID_03NakiA03": {
+   "item_id": 362,
+   "rarity": "Nothing",
+   "chara": 2
+  },
+  "OID_04NakiA03": {
+   "item_id": 363,
+   "rarity": "Nothing",
+   "chara": 3
+  },
+  "OID_05NakiA03": {
+   "item_id": 364,
+   "rarity": "Nothing",
+   "chara": 4
+  },
+  "OID_06NakiA03": {
+   "item_id": 365,
+   "rarity": "Nothing",
+   "chara": 5
+  },
+  "OID_07NakiA03": {
+   "item_id": 366,
+   "rarity": "Nothing",
+   "chara": 6
+  },
+  "OID_08NakiA03": {
+   "item_id": 367,
+   "rarity": "Nothing",
+   "chara": 7
+  },
+  "OID_09NakiA03": {
+   "item_id": 368,
+   "rarity": "Nothing",
+   "chara": 8
+  },
+  "OID_10NakiA03": {
+   "item_id": 369,
+   "rarity": "Nothing",
+   "chara": 9
+  },
+  "OID_11NakiA03": {
+   "item_id": 370,
+   "rarity": "Nothing",
+   "chara": 10
+  },
+  "OID_12NakiA03": {
+   "item_id": 371,
+   "rarity": "Nothing",
+   "chara": 11
+  },
+  "OID_13NakiA03": {
+   "item_id": 372,
+   "rarity": "Nothing",
+   "chara": 12
+  },
+  "OID_14NakiA03": {
+   "item_id": 373,
+   "rarity": "Nothing",
+   "chara": 13
+  },
+  "OID_15NakiA02": {
+   "item_id": 374,
+   "rarity": "Nothing",
+   "chara": 14
+  },
+  "OID_16NakiA02": {
+   "item_id": 375,
+   "rarity": "Nothing",
+   "chara": 15
+  },
+  "OID_17NakiA02": {
+   "item_id": 376,
+   "rarity": "Nothing",
+   "chara": 16
+  },
+  "OID_07AgariSR14": {
+   "item_id": 377,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_07AgariSR15": {
+   "item_id": 378,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_09AgariSR13": {
+   "item_id": 379,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_09AgariSR14": {
+   "item_id": 380,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_09AgariSR15": {
+   "item_id": 381,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_09AgariSR16": {
+   "item_id": 382,
+   "rarity": "SR",
+   "chara": 8
+  },
+  "OID_05AgariSR15": {
+   "item_id": 383,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_05AgariSR16": {
+   "item_id": 384,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_04AgariSR13": {
+   "item_id": 385,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_18AgariSR01": {
+   "item_id": 386,
+   "rarity": "SR",
+   "chara": 17
+  },
+  "OID_18AgariR01": {
+   "item_id": 387,
+   "rarity": "R",
+   "chara": 17
+  },
+  "OID_18AgariSR02": {
+   "item_id": 388,
+   "rarity": "SR",
+   "chara": 17
+  },
+  "OID_18AgariSR03": {
+   "item_id": 389,
+   "rarity": "SR",
+   "chara": 17
+  },
+  "OID_18AgariSR04": {
+   "item_id": 390,
+   "rarity": "SR",
+   "chara": 17
+  },
+  "OID_18AgariSR05": {
+   "item_id": 391,
+   "rarity": "SR",
+   "chara": 17
+  },
+  "OID_18AgariSR06": {
+   "item_id": 392,
+   "rarity": "SR",
+   "chara": 17
+  },
+  "OID_18NakiA01": {
+   "item_id": 396,
+   "rarity": "Nothing",
+   "chara": 17
+  },
+  "OID_18NakiN01": {
+   "item_id": 397,
+   "rarity": "N",
+   "chara": 17
+  },
+  "OID_18NakiN02": {
+   "item_id": 398,
+   "rarity": "N",
+   "chara": 17
+  },
+  "OID_18NakiN03": {
+   "item_id": 399,
+   "rarity": "N",
+   "chara": 17
+  },
+  "OID_18ReachA01": {
+   "item_id": 393,
+   "rarity": "Nothing",
+   "chara": 17
+  },
+  "OID_18ReachR01": {
+   "item_id": 394,
+   "rarity": "R",
+   "chara": 17
+  },
+  "OID_18ReachR02": {
+   "item_id": 395,
+   "rarity": "R",
+   "chara": 17
+  },
+  "OID_04AgariSR14": {
+   "item_id": 400,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_04AgariSR15": {
+   "item_id": 401,
+   "rarity": "SR",
+   "chara": 3
+  },
+  "OID_16AgariSR09": {
+   "item_id": 402,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariSR10": {
+   "item_id": 403,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_07AgariSR16": {
+   "item_id": 404,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_13AgariSR11": {
+   "item_id": 405,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_07AgariSR17": {
+   "item_id": 406,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_13AgariSR12": {
+   "item_id": 407,
+   "rarity": "SR",
+   "chara": 12
+  },
+  "OID_17AgariSR07": {
+   "item_id": 408,
+   "rarity": "SR",
+   "chara": 16
+  },
+  "OID_17AgariSR08": {
+   "item_id": 409,
+   "rarity": "SR",
+   "chara": 16
+  },
+  "OID_08AgariSR12": {
+   "item_id": 410,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_19AgariSR01": {
+   "item_id": 411,
+   "rarity": "SR",
+   "chara": 18
+  },
+  "OID_19AgariR01": {
+   "item_id": 412,
+   "rarity": "R",
+   "chara": 18
+  },
+  "OID_19AgariSR02": {
+   "item_id": 413,
+   "rarity": "SR",
+   "chara": 18
+  },
+  "OID_19AgariSR03": {
+   "item_id": 414,
+   "rarity": "SR",
+   "chara": 18
+  },
+  "OID_19AgariSR04": {
+   "item_id": 415,
+   "rarity": "SR",
+   "chara": 18
+  },
+  "OID_19AgariSR05": {
+   "item_id": 416,
+   "rarity": "SR",
+   "chara": 18
+  },
+  "OID_19AgariSR06": {
+   "item_id": 417,
+   "rarity": "SR",
+   "chara": 18
+  },
+  "OID_19NakiA01": {
+   "item_id": 421,
+   "rarity": "Nothing",
+   "chara": 18
+  },
+  "OID_19NakiN01": {
+   "item_id": 422,
+   "rarity": "N",
+   "chara": 18
+  },
+  "OID_19NakiN02": {
+   "item_id": 423,
+   "rarity": "N",
+   "chara": 18
+  },
+  "OID_19NakiN03": {
+   "item_id": 424,
+   "rarity": "N",
+   "chara": 18
+  },
+  "OID_19ReachA01": {
+   "item_id": 418,
+   "rarity": "Nothing",
+   "chara": 18
+  },
+  "OID_19ReachR01": {
+   "item_id": 419,
+   "rarity": "R",
+   "chara": 18
+  },
+  "OID_19ReachR02": {
+   "item_id": 420,
+   "rarity": "R",
+   "chara": 18
+  },
+  "OID_14AgariSR09": {
+   "item_id": 425,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14AgariSR10": {
+   "item_id": 426,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_01AgariSR12": {
+   "item_id": 427,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_02AgariSR15": {
+   "item_id": 428,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_05AgariSR17": {
+   "item_id": 429,
+   "rarity": "SR",
+   "chara": 4
+  },
+  "OID_12AgariSR10": {
+   "item_id": 430,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_12AgariSR11": {
+   "item_id": 431,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_18AgariSR07": {
+   "item_id": 432,
+   "rarity": "SR",
+   "chara": 17
+  },
+  "OID_18AgariSR08": {
+   "item_id": 433,
+   "rarity": "SR",
+   "chara": 17
+  },
+  "OID_14AgariSR11": {
+   "item_id": 434,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_14AgariSR12": {
+   "item_id": 435,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_01AgariSR13": {
+   "item_id": 436,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_01AgariSR14": {
+   "item_id": 437,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_06AgariSR14": {
+   "item_id": 438,
+   "rarity": "SR",
+   "chara": 5
+  },
+  "OID_20AgariSR01": {
+   "item_id": 439,
+   "rarity": "SR",
+   "chara": 19
+  },
+  "OID_20AgariR01": {
+   "item_id": 440,
+   "rarity": "R",
+   "chara": 19
+  },
+  "OID_20AgariSR02": {
+   "item_id": 441,
+   "rarity": "SR",
+   "chara": 19
+  },
+  "OID_20AgariSR03": {
+   "item_id": 442,
+   "rarity": "SR",
+   "chara": 19
+  },
+  "OID_20AgariSR04": {
+   "item_id": 443,
+   "rarity": "SR",
+   "chara": 19
+  },
+  "OID_20AgariSR05": {
+   "item_id": 444,
+   "rarity": "SR",
+   "chara": 19
+  },
+  "OID_20AgariSR06": {
+   "item_id": 445,
+   "rarity": "SR",
+   "chara": 19
+  },
+  "OID_20NakiA01": {
+   "item_id": 449,
+   "rarity": "Nothing",
+   "chara": 19
+  },
+  "OID_20NakiN01": {
+   "item_id": 450,
+   "rarity": "N",
+   "chara": 19
+  },
+  "OID_20NakiN02": {
+   "item_id": 451,
+   "rarity": "N",
+   "chara": 19
+  },
+  "OID_20NakiN03": {
+   "item_id": 452,
+   "rarity": "N",
+   "chara": 19
+  },
+  "OID_20ReachA01": {
+   "item_id": 446,
+   "rarity": "Nothing",
+   "chara": 19
+  },
+  "OID_20ReachR01": {
+   "item_id": 447,
+   "rarity": "R",
+   "chara": 19
+  },
+  "OID_20ReachR02": {
+   "item_id": 448,
+   "rarity": "R",
+   "chara": 19
+  },
+  "OID_02AgariSR16": {
+   "item_id": 453,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_02AgariSR17": {
+   "item_id": 454,
+   "rarity": "SR",
+   "chara": 1
+  },
+  "OID_15AgariSR09": {
+   "item_id": 455,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_15AgariSR10": {
+   "item_id": 456,
+   "rarity": "SR",
+   "chara": 14
+  },
+  "OID_16AgariSR11": {
+   "item_id": 457,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariSR12": {
+   "item_id": 458,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_01AgariSR15": {
+   "item_id": 459,
+   "rarity": "SR",
+   "chara": 0
+  },
+  "OID_12AgariSR12": {
+   "item_id": 460,
+   "rarity": "SR",
+   "chara": 11
+  },
+  "OID_14AgariSR13": {
+   "item_id": 461,
+   "rarity": "SR",
+   "chara": 13
+  },
+  "OID_11AgariSR10": {
+   "item_id": 462,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_11AgariSR11": {
+   "item_id": 463,
+   "rarity": "SR",
+   "chara": 10
+  },
+  "OID_19AgariSR07": {
+   "item_id": 464,
+   "rarity": "SR",
+   "chara": 18
+  },
+  "OID_19AgariSR08": {
+   "item_id": 465,
+   "rarity": "SR",
+   "chara": 18
+  },
+  "OID_08AgariSR13": {
+   "item_id": 466,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_08AgariSR14": {
+   "item_id": 467,
+   "rarity": "SR",
+   "chara": 7
+  },
+  "OID_03AgariSR13": {
+   "item_id": 468,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_03AgariSR14": {
+   "item_id": 469,
+   "rarity": "SR",
+   "chara": 2
+  },
+  "OID_01NakiA04": {
+   "item_id": 470,
+   "rarity": "Nothing",
+   "chara": 0
+  },
+  "OID_02NakiA04": {
+   "item_id": 471,
+   "rarity": "Nothing",
+   "chara": 1
+  },
+  "OID_03NakiA04": {
+   "item_id": 472,
+   "rarity": "Nothing",
+   "chara": 2
+  },
+  "OID_04NakiA04": {
+   "item_id": 473,
+   "rarity": "Nothing",
+   "chara": 3
+  },
+  "OID_05NakiA04": {
+   "item_id": 474,
+   "rarity": "Nothing",
+   "chara": 4
+  },
+  "OID_06NakiA04": {
+   "item_id": 475,
+   "rarity": "Nothing",
+   "chara": 5
+  },
+  "OID_07NakiA04": {
+   "item_id": 476,
+   "rarity": "Nothing",
+   "chara": 6
+  },
+  "OID_08NakiA04": {
+   "item_id": 477,
+   "rarity": "Nothing",
+   "chara": 7
+  },
+  "OID_09NakiA04": {
+   "item_id": 478,
+   "rarity": "Nothing",
+   "chara": 8
+  },
+  "OID_10NakiA04": {
+   "item_id": 479,
+   "rarity": "Nothing",
+   "chara": 9
+  },
+  "OID_11NakiA04": {
+   "item_id": 480,
+   "rarity": "Nothing",
+   "chara": 10
+  },
+  "OID_12NakiA04": {
+   "item_id": 481,
+   "rarity": "Nothing",
+   "chara": 11
+  },
+  "OID_13NakiA04": {
+   "item_id": 482,
+   "rarity": "Nothing",
+   "chara": 12
+  },
+  "OID_14NakiA04": {
+   "item_id": 483,
+   "rarity": "Nothing",
+   "chara": 13
+  },
+  "OID_15NakiA03": {
+   "item_id": 484,
+   "rarity": "Nothing",
+   "chara": 14
+  },
+  "OID_16NakiA03": {
+   "item_id": 485,
+   "rarity": "Nothing",
+   "chara": 15
+  },
+  "OID_17NakiA03": {
+   "item_id": 486,
+   "rarity": "Nothing",
+   "chara": 16
+  },
+  "OID_18NakiA02": {
+   "item_id": 487,
+   "rarity": "Nothing",
+   "chara": 17
+  },
+  "OID_19NakiA02": {
+   "item_id": 488,
+   "rarity": "Nothing",
+   "chara": 18
+  },
+  "OID_20NakiA02": {
+   "item_id": 489,
+   "rarity": "Nothing",
+   "chara": 19
+  },
+  "OID_07AgariSR18": {
+   "item_id": 490,
+   "rarity": "SR",
+   "chara": 6
+  },
+  "OID_16AgariSR13": {
+   "item_id": 491,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_16AgariSR14": {
+   "item_id": 492,
+   "rarity": "SR",
+   "chara": 15
+  },
+  "OID_21AgariSR01": {
+   "item_id": 493,
+   "rarity": "SR",
+   "chara": 20
+  },
+  "OID_21AgariR01": {
+   "item_id": 494,
+   "rarity": "R",
+   "chara": 20
+  },
+  "OID_21AgariSR02": {
+   "item_id": 495,
+   "rarity": "SR",
+   "chara": 20
+  },
+  "OID_21AgariSR03": {
+   "item_id": 496,
+   "rarity": "SR",
+   "chara": 20
+  },
+  "OID_21AgariSR04": {
+   "item_id": 497,
+   "rarity": "SR",
+   "chara": 20
+  },
+  "OID_21AgariSR05": {
+   "item_id": 498,
+   "rarity": "SR",
+   "chara": 20
+  },
+  "OID_21AgariSR06": {
+   "item_id": 499,
+   "rarity": "SR",
+   "chara": 20
+  },
+  "OID_21NakiA01": {
+   "item_id": 503,
+   "rarity": "Nothing",
+   "chara": 20
+  },
+  "OID_21NakiN01": {
+   "item_id": 504,
+   "rarity": "N",
+   "chara": 20
+  },
+  "OID_21NakiN02": {
+   "item_id": 505,
+   "rarity": "N",
+   "chara": 20
+  },
+  "OID_21NakiN03": {
+   "item_id": 506,
+   "rarity": "N",
+   "chara": 20
+  },
+  "OID_21ReachA01": {
+   "item_id": 500,
+   "rarity": "Nothing",
+   "chara": 20
+  },
+  "OID_21ReachR01": {
+   "item_id": 501,
+   "rarity": "R",
+   "chara": 20
+  },
+  "OID_21ReachR02": {
+   "item_id": 502,
+   "rarity": "R",
+   "chara": 20
+  },
+  "OID_20AgariSR07": {
+   "item_id": 507,
+   "rarity": "SR",
+   "chara": 19
+  },
+  "OID_20AgariSR08": {
+   "item_id": 508,
+   "rarity": "SR",
+   "chara": 19
+  },
+  "OID_21NakiA02": {
+   "item_id": 509,
+   "rarity": "Nothing",
+   "chara": 20
+  }
+ },
+ "default_item_ids": [
+  1,
+  7,
+  10,
+  14,
+  21,
+  24,
+  28,
+  34,
+  37,
+  41,
+  47,
+  50,
+  54,
+  60,
+  63,
+  67,
+  74,
+  77,
+  81,
+  87,
+  90,
+  94,
+  100,
+  103,
+  107,
+  113,
+  116,
+  127,
+  133,
+  136,
+  157,
+  164,
+  167,
+  183,
+  186,
+  213,
+  216,
+  254,
+  257,
+  286,
+  289,
+  312,
+  315,
+  345,
+  348,
+  393,
+  396,
+  418,
+  421,
+  446,
+  449,
+  503
+ ]
+}

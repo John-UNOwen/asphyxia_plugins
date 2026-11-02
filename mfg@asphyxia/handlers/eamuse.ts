@@ -33,6 +33,7 @@ import {
   gameBaseUrl,
   ensureProfile,
   vlog,
+  recordCardAuthIntent,
 } from "./utils";
 
 // helpers for cardmng
@@ -134,12 +135,16 @@ async function loadCardFromDB(cardid: string): Promise<any | null> {
     if (!all) return null;
     for (const p of all) {
       if (p && String(p.card_id || "").toUpperCase() === want) {
+        // This branch finds the card THROUGH profile.card_id, so the card is
+        // bound to that account by definition. card_bound is a field nothing in
+        // the plugin ever writes; reading it alone answered a bound card as
+        // binded=0/newflag=1 and forked the client into new-card registration.
         const rec: any = {
           collection: "cards",
           card_id: String(cardid).toUpperCase(),
           refid: String(p.refid || "").toUpperCase(),
           issued: !!p.card_issued,
-          bound: !!p.card_bound,
+          bound: !!(p.card_bound || p.card_id),
           pin: p.card_pin || "0000",
           updated_at: p.card_updated_at || p.updated_at || 0,
           created_at: p.created_at || 0,
@@ -257,7 +262,7 @@ async function handleEventlogWrite(info: any, data: any, send: any): Promise<voi
 }
 
 // cardmng (with vfgcard shadow)
-async function handleCardmng(info: any, data: any, send: any): Promise<void> {
+export async function handleCardmng(info: any, data: any, send: any): Promise<void> {
   // data may contain cardid/refid in @attr
   // Extract raw values (handle sanitized "|" form)
   let rawCardId = cardAttr(data, "cardid") || cardAttr(data, "card_id") || "";
@@ -331,6 +336,40 @@ async function handleCardmng(info: any, data: any, send: any): Promise<void> {
       if (!refKey) rec = dbRec;
     }
   }
+  // Web lane self-presentation: the hosted gate pins each web session its unique
+  // DataID, and CardEntryScene presents that DataID as the session's own card
+  // (the account's unique id doubles as its card credential). Only a canonical 16-hex
+  // id that IS an existing account's refid resolves here - it answers with that
+  // account's own card (bound, never a fresh profile), creates the profile doc only
+  // for a freshly claimed web account, and persists the binding via saveCardToProfile.
+  if (!recByCard && canonical && method === "inquire") {
+    try {
+      const { getProfileByRefid, ensureProfile } = await import("./utils");
+      let prof: any = null;
+      try { prof = await getProfileByRefid(cardKey); } catch { }
+      if (!prof) {
+        await ensureProfile(cardKey, "GUEST");
+        try { prof = await getProfileByRefid(cardKey); } catch { }
+      }
+      if (prof && prof.refid) {
+        const recSelf: any = {
+          collection: "cards",
+          card_id: cardKey,
+          refid: String(prof.refid).toUpperCase(),
+          issued: true,
+          bound: true,
+          pin: prof.card_pin || "0000",
+          updated_at: nowUnix(),
+          created_at: prof.created_at || nowUnix(),
+        };
+        recByCard = recSelf;
+        if (!refKey) rec = recSelf;
+        setCard(cardKey, recSelf);
+        await saveCardToProfile(cardKey, recSelf.refid, recSelf);
+        vlog(`[cardmng] inquire selfcard card=${cardKey} refid=${recSelf.refid}`);
+      }
+    } catch (e) { try { console.error("selfcard error:", e); } catch {} }
+  }
   if (refKey && !recByRefid) {
     // Look for profile with this refid and check it has a card
     try {
@@ -342,7 +381,7 @@ async function handleCardmng(info: any, data: any, send: any): Promise<void> {
           card_id: String(prof.card_id).toUpperCase(),
           refid: String(prof.refid).toUpperCase(),
           issued: !!prof.card_issued,
-          bound: !!prof.card_bound,
+          bound: !!(prof.card_bound || prof.card_id),
           pin: prof.card_pin || "0000",
           updated_at: prof.card_updated_at || prof.updated_at || 0,
           created_at: prof.created_at || 0,
@@ -372,6 +411,12 @@ async function handleCardmng(info: any, data: any, send: any): Promise<void> {
     const refid = recByCard.refid;
     const bound = !!recByCard.bound;
     const lastupdate = Math.floor((recByCard.updated_at || recByCard.created_at || nowUnix()));
+    // The card id behind this inquire is the account's credential. Stamp the
+    // presentation on the account's own document (utils.ts recordCardAuthIntent)
+    // so the game front, whose /login carries only user_id (Login.cs:20), can tell
+    // the card's holder from somebody who only knows the refid. Canonical only: a
+    // malformed id that normalizeCardId maps onto DEFAULT_CARDID authorises nothing.
+    if (canonical) await recordCardAuthIntent(refid, cardKey);
     // success without status, attrs on element
     await send.object({
       "@attr": {
@@ -429,6 +474,10 @@ async function handleCardmng(info: any, data: any, send: any): Promise<void> {
       } catch { }
       await saveCardToProfile(cardKey, refid, recNew);
     }
+    // Same credential stamp as inquire: getrefid is the new-card presentation
+    // (CardEntryManager's new-card path), and the refid minted here is the one the
+    // front is about to be asked to log into (create_player + login).
+    if (canonical) await recordCardAuthIntent(refid, cardKey);
     await send.object({
       "@attr": {
         refid,
@@ -455,6 +504,11 @@ async function handleCardmng(info: any, data: any, send: any): Promise<void> {
     rec.refid = String(rec.refid || reqRefid || "").toUpperCase();
     rec.card_id = String(rec.card_id || cardid || "").toUpperCase();
     setCard(rec.card_id, rec);
+    // Only a bind whose record was found by the card id on the request (recByCard,
+    // not the refid index recByRefid) is a credential presentation: recByRefid is
+    // reachable with a refid alone, and a refid alone authorises nothing
+    // (utils.ts loginGate).
+    if (canonical && recByCard && recByCard === rec) await recordCardAuthIntent(rec.refid, cardKey);
     // bind profile to gamecode and persist card data inside profile
     // (never touch profile.name here — that belongs to create_player)
     try {
@@ -478,7 +532,7 @@ async function handleCardmng(info: any, data: any, send: any): Promise<void> {
 }
 
 // vfgac / vfglog / eacoin
-async function handleVfgac(info: any, data: any, send: any): Promise<void> {
+export async function handleVfgac(info: any, data: any, send: any): Promise<void> {
   const method = (info.method || "").toLowerCase();
   if (method === "service_list") {
     // Allow custom override like old plugin (mfg_service_url)

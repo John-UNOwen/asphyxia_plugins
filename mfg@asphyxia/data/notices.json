@@ -1,0 +1,48 @@
+{
+  "_comment": "Front-server notice content (handlers/utils.ts noticeGameJson / receiveOnlyJson). 'notice' feeds the client's notice_game state (MFG.GameData/NoticeGameData.cs -> HomeNoticeWindow / NoticeCarouselBanner); 'important' feeds receive_only.ImportantNotices (ReceiveOnlyGameData.cs -> HomeFlow.ImportantNoticeAppearance -> ImportantNoticeWindow). 'category' accepts a MFG.Types.Notice.Category name or its int. An id the account has acked (notice_done / important_notice_done) is never served again. 'home_display' true + a home_display_end in the future makes the notice a home carousel banner AND a forced-display modal, so home_banner must name a banner asset the client build actually has; leave both empty to publish a plain list entry. 'important' ids must be MFG.Types.ImportantNotice.NoticeID members (Manner=1, Nuisance=2) - ImportantNoticeWindow finds its page by that name and skips ids its master does not have.",
+  "notice": [
+    {
+      "id": 1,
+      "category": "Update",
+      "title": "Server build notes",
+      "text": "Self-hosted front server.\n\n- Matching, event tables, gacha, Spirit Gym, records and stamps are served by this server.\n- Notices, missions and event schedules are configured in the plugin data files.\n\nRead the notices once: an acknowledged notice is never sent again.",
+      "release": "2026-06-09 12:00",
+      "update": "",
+      "is_new": true,
+      "home_display": false,
+      "home_banner": "",
+      "home_display_end": "",
+      "image_url": ""
+    },
+    {
+      "id": 2,
+      "category": "Information",
+      "title": "Daily bonus",
+      "text": "One daily login bonus present is granted per JST day and lands in the present box automatically.",
+      "release": "2026-06-09 12:00",
+      "update": "",
+      "is_new": true,
+      "home_display": false,
+      "home_banner": "",
+      "home_display_end": "",
+      "image_url": ""
+    },
+    {
+      "id": 3,
+      "category": "Campaign",
+      "title": "Costume additions unlocked",
+      "text": "Every CostumeAddition event is declared active, so costume unlocks show in My Room without a dated schedule behind them.",
+      "release": "2026-06-09 12:00",
+      "update": "",
+      "is_new": false,
+      "home_display": false,
+      "home_banner": "",
+      "home_display_end": "",
+      "image_url": ""
+    }
+  ],
+  "important": [
+    { "id": 1 },
+    { "id": 2 }
+  ]
+}

@@ -1,0 +1,520 @@
+{
+ "_source": "api/recovered/Assembly-CSharp/MFG.Types.Mission/Category.cs (declaration order, id == enum int)",
+ "categories": [
+  {
+   "id": 0,
+   "name": "None",
+   "active": false
+  },
+  {
+   "id": 1,
+   "name": "JudgmentDaily",
+   "active": true
+  },
+  {
+   "id": 2,
+   "name": "JudgmentWeekly",
+   "active": true
+  },
+  {
+   "id": 3,
+   "name": "Player",
+   "active": true
+  },
+  {
+   "id": 4,
+   "name": "Character",
+   "active": true
+  },
+  {
+   "id": 5,
+   "name": "Weekly",
+   "active": true
+  },
+  {
+   "id": 6,
+   "name": "Yaku",
+   "active": true
+  },
+  {
+   "id": 7,
+   "name": "StartDash",
+   "active": true
+  },
+  {
+   "id": 8,
+   "name": "Scramble",
+   "active": false
+  },
+  {
+   "id": 9,
+   "name": "MahjongActor",
+   "active": false
+  },
+  {
+   "id": 10,
+   "name": "Birthday",
+   "active": false
+  },
+  {
+   "id": 11,
+   "name": "Mentanpin2",
+   "active": false
+  },
+  {
+   "id": 12,
+   "name": "HalfAnniv2024",
+   "active": false
+  },
+  {
+   "id": 13,
+   "name": "Halloween2024",
+   "active": false
+  },
+  {
+   "id": 14,
+   "name": "GrimAroeTicket",
+   "active": false
+  },
+  {
+   "id": 15,
+   "name": "Birthday2024_02",
+   "active": false
+  },
+  {
+   "id": 16,
+   "name": "MeldBonus",
+   "active": false
+  },
+  {
+   "id": 17,
+   "name": "WelcomeComeback3",
+   "active": false
+  },
+  {
+   "id": 18,
+   "name": "Xmas2024",
+   "active": false
+  },
+  {
+   "id": 19,
+   "name": "Competition6",
+   "active": false
+  },
+  {
+   "id": 20,
+   "name": "NewYear2025",
+   "active": false
+  },
+  {
+   "id": 21,
+   "name": "Birthday2025_13",
+   "active": false
+  },
+  {
+   "id": 22,
+   "name": "Valentine2025",
+   "active": false
+  },
+  {
+   "id": 23,
+   "name": "Birthday2025_05",
+   "active": false
+  },
+  {
+   "id": 24,
+   "name": "Reversal",
+   "active": false
+  },
+  {
+   "id": 25,
+   "name": "Birthday2025_14",
+   "active": false
+  },
+  {
+   "id": 26,
+   "name": "DiaTicket",
+   "active": false
+  },
+  {
+   "id": 27,
+   "name": "Birthday2025_15",
+   "active": false
+  },
+  {
+   "id": 28,
+   "name": "Birthday2025_09",
+   "active": false
+  },
+  {
+   "id": 29,
+   "name": "Anniv2025",
+   "active": false
+  },
+  {
+   "id": 30,
+   "name": "WelcomeComeback4",
+   "active": false
+  },
+  {
+   "id": 31,
+   "name": "Aotenjo2025",
+   "active": false
+  },
+  {
+   "id": 32,
+   "name": "Birthday2025_16",
+   "active": false
+  },
+  {
+   "id": 33,
+   "name": "Birthday2025_07",
+   "active": false
+  },
+  {
+   "id": 34,
+   "name": "Janpon2",
+   "active": false
+  },
+  {
+   "id": 35,
+   "name": "Bemani002",
+   "active": false
+  },
+  {
+   "id": 36,
+   "name": "Blooming",
+   "active": false
+  },
+  {
+   "id": 37,
+   "name": "Competition7",
+   "active": false
+  },
+  {
+   "id": 38,
+   "name": "GW2025",
+   "active": false
+  },
+  {
+   "id": 39,
+   "name": "CharaPai001",
+   "active": false
+  },
+  {
+   "id": 40,
+   "name": "MeldBonus2",
+   "active": false
+  },
+  {
+   "id": 41,
+   "name": "Birthday2025_11_12",
+   "active": false
+  },
+  {
+   "id": 42,
+   "name": "Birthday2025_10",
+   "active": false
+  },
+  {
+   "id": 43,
+   "name": "Birthday2025_08",
+   "active": false
+  },
+  {
+   "id": 44,
+   "name": "CharaPai002",
+   "active": false
+  },
+  {
+   "id": 45,
+   "name": "DoubrielTicket",
+   "active": false
+  },
+  {
+   "id": 46,
+   "name": "Birthday2025_03",
+   "active": false
+  },
+  {
+   "id": 47,
+   "name": "Bomb",
+   "active": false
+  },
+  {
+   "id": 48,
+   "name": "Poolside",
+   "active": false
+  },
+  {
+   "id": 49,
+   "name": "Ponnomichi",
+   "active": false
+  },
+  {
+   "id": 50,
+   "name": "Bonodori001",
+   "active": false
+  },
+  {
+   "id": 51,
+   "name": "Birthday2025_06",
+   "active": false
+  },
+  {
+   "id": 52,
+   "name": "WelcomeComeback5",
+   "active": false
+  },
+  {
+   "id": 53,
+   "name": "Competition8",
+   "active": false
+  },
+  {
+   "id": 54,
+   "name": "Bonodori002",
+   "active": false
+  },
+  {
+   "id": 55,
+   "name": "Birthday2025_01",
+   "active": false
+  },
+  {
+   "id": 56,
+   "name": "IppatsuTicket",
+   "active": false
+  },
+  {
+   "id": 57,
+   "name": "Birthday2025_04",
+   "active": false
+  },
+  {
+   "id": 58,
+   "name": "Bingo3",
+   "active": false
+  },
+  {
+   "id": 59,
+   "name": "HalfAnniv2025",
+   "active": false
+  },
+  {
+   "id": 60,
+   "name": "Janpon3",
+   "active": false
+  },
+  {
+   "id": 61,
+   "name": "AllGreen",
+   "active": false
+  },
+  {
+   "id": 62,
+   "name": "Birthday2025_18",
+   "active": false
+  },
+  {
+   "id": 63,
+   "name": "Birthday2025_02",
+   "active": false
+  },
+  {
+   "id": 64,
+   "name": "AutumnLeaves",
+   "active": false
+  },
+  {
+   "id": 65,
+   "name": "BowBow2025",
+   "active": false
+  },
+  {
+   "id": 66,
+   "name": "Birthday2025_17",
+   "active": false
+  },
+  {
+   "id": 67,
+   "name": "ShiroeTicket",
+   "active": false
+  },
+  {
+   "id": 68,
+   "name": "DecorationSticker",
+   "active": false
+  },
+  {
+   "id": 69,
+   "name": "MotherWars",
+   "active": false
+  },
+  {
+   "id": 70,
+   "name": "Anniv1000days",
+   "active": false
+  },
+  {
+   "id": 71,
+   "name": "Omikuji2026",
+   "active": false
+  },
+  {
+   "id": 72,
+   "name": "ShopCompe001_1",
+   "active": false
+  },
+  {
+   "id": 73,
+   "name": "ShopCompe001_2",
+   "active": false
+  },
+  {
+   "id": 74,
+   "name": "Birthday2026_13",
+   "active": false
+  },
+  {
+   "id": 75,
+   "name": "Valentine2026",
+   "active": false
+  },
+  {
+   "id": 76,
+   "name": "Birthday2026_19",
+   "active": false
+  },
+  {
+   "id": 77,
+   "name": "Birthday2026_05",
+   "active": false
+  },
+  {
+   "id": 78,
+   "name": "Comeback2",
+   "active": false
+  },
+  {
+   "id": 79,
+   "name": "Atomic",
+   "active": false
+  },
+  {
+   "id": 80,
+   "name": "Birthday2026_14",
+   "active": false
+  },
+  {
+   "id": 81,
+   "name": "Birthday2026_15",
+   "active": false
+  },
+  {
+   "id": 82,
+   "name": "JunTicket",
+   "active": false
+  },
+  {
+   "id": 83,
+   "name": "Birthday2026_09",
+   "active": false
+  },
+  {
+   "id": 84,
+   "name": "CharaPai003",
+   "active": false
+  },
+  {
+   "id": 85,
+   "name": "Janpon4",
+   "active": false
+  },
+  {
+   "id": 86,
+   "name": "Anniv2026",
+   "active": false
+  },
+  {
+   "id": 87,
+   "name": "Birthday2026_07",
+   "active": false
+  },
+  {
+   "id": 88,
+   "name": "Birthday2026_16",
+   "active": false
+  },
+  {
+   "id": 89,
+   "name": "Bemani003",
+   "active": false
+  },
+  {
+   "id": 90,
+   "name": "Aotenjo2026",
+   "active": false
+  },
+  {
+   "id": 91,
+   "name": "Spring2026",
+   "active": false
+  },
+  {
+   "id": 92,
+   "name": "Birthday2026_11_12",
+   "active": false
+  },
+  {
+   "id": 93,
+   "name": "Birthday2026_10",
+   "active": false
+  },
+  {
+   "id": 94,
+   "name": "SportsDay",
+   "active": false
+  },
+  {
+   "id": 95,
+   "name": "RainyDay001",
+   "active": false
+  },
+  {
+   "id": 96,
+   "name": "Competition9",
+   "active": false
+  },
+  {
+   "id": 97,
+   "name": "WelcomeComeback6",
+   "active": false
+  },
+  {
+   "id": 98,
+   "name": "Birthday2026_08",
+   "active": false
+  },
+  {
+   "id": 99,
+   "name": "ToukaTicket",
+   "active": false
+  },
+  {
+   "id": 100,
+   "name": "Birthday2026_20",
+   "active": false
+  },
+  {
+   "id": 101,
+   "name": "Birthday2026_03",
+   "active": false
+  },
+  {
+   "id": 102,
+   "name": "RainyDay002",
+   "active": false
+  }
+ ]
+}

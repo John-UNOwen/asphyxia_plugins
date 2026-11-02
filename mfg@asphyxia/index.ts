@@ -108,6 +108,15 @@ export function register(): void {
     });
   } catch {}
   try {
+    R.Config("mfg_http_bind", {
+      name: "MFG HTTP Bind (native)",
+      desc: "Bind address for the separate AOG HTTP server. Default 127.0.0.1 (loopback; the old 0.0.0.0 native-client behaviour must be asked for explicitly). On a hosted deployment the browser plays through the web front + core integrated AOG, and an unauthenticated AOG listener on a public interface is exactly what the hosting plan (docs/28) locks down.",
+      type: "string",
+      default: "127.0.0.1",
+      needRestart: true,
+    });
+  } catch {}
+  try {
     R.Config("VFG_VERBOSE", {
       name: "Verbose Logging",
       desc: "If enabled, per-request/per-player debug logs go to console. OFF by default to avoid spam with many players. Errors always show.",
@@ -189,6 +198,15 @@ export function register(): void {
       needRestart: true,
     });
   } catch {}
+  try {
+    R.Config("VFG_PRESENTER_SECRET", {
+      name: "Web Presenter Secret",
+      desc: `Shared secret between this server and a web front hosting the browser lane (AOG route /vfgcard_present, docs/28). The front - which verified the account's web session - presents the account's own DataID as its card credential: first call binds the credential (profile.card_id, like a card scan would), every call stamps the presentation the next /login must answer with. Only a canonical 16-hex id equal to the account's own DataID is ever bound, so the secret arms nothing it does not already control. Empty (default): the route answers nothing, no account gets bound, the deployment stays on the bearer/takeover rule.`,
+      type: "string",
+      default: "",
+      needRestart: true,
+    });
+  } catch {}
 
   registerEamuseRoutes();
   registerAogRoutes();
@@ -257,10 +275,12 @@ export function register(): void {
   // Start separate native HTTP server on 22421 (like old mfg@asphyxia_bk) for AOG
   try {
     const http = require('http');
-    // Same knobs as the shipped dist plugin (docs/28): precedence env >
-    // config.ini (GetConfig first, then a direct cwd-independent read next to
-    // the dist tree) > default. Bind defaults to loopback so a knob lost by a
-    // wrong cwd can never expose the unauthenticated AOG listener publicly.
+    // Resolve port/bind AT LISTEN TIME (review round 2 major #7): at module load
+    // GetConfig may still answer the registered default, which silently made the
+    // config.ini knobs inert. Precedence: environment, then config.ini, then default.
+    // U.GetConfig resolves config.ini against the process cwd, so a core started
+    // from any other directory silently loses every knob (review round 2 major #8).
+    // This fallback reads the ini next to the dist tree itself - cwd-independent.
     const directKnob = (name: string): string => {
       try {
         const fs = require('fs'), nodePath = require('path');
@@ -272,18 +292,20 @@ export function register(): void {
       } catch {}
       return '';
     };
-    const HTTP_PORT = (() => {
+    const resolveHttpPort = (): number => {
       try { const e = process.env['mfg_http_port']; if (e && Number(e) > 0) return Number(e); } catch {}
-      try { const v = U.GetConfig('mfg_http_port'); if (v) return Number(v); } catch {}
+      try { const v = U.GetConfig('mfg_http_port'); if (v && Number(v) > 0) return Number(v); } catch {}
       const d = directKnob('mfg_http_port'); if (d && Number(d) > 0) return Number(d);
       return 22421;
-    })();
-    const HTTP_BIND = (() => {
+    };
+    const resolveHttpBind = (): string => {
       try { const e = process.env['mfg_http_bind']; if (e) return e; } catch {}
       try { const v = U.GetConfig('mfg_http_bind'); if (v && String(v).trim()) return String(v).trim(); } catch {}
       const d = directKnob('mfg_http_bind'); if (d) return d;
+      // Default is loopback: a knob lost by a wrong cwd must never widen the
+      // bind to every interface (docs/28 hosting posture).
       return '127.0.0.1';
-    })();
+    };
 
     function parseFormNative(body: string): Record<string,string> {
       const out: Record<string,string> = {};
@@ -364,13 +386,18 @@ export function register(): void {
         }
       });
     });
-    server.listen(HTTP_PORT, HTTP_BIND, () => {
-      console.log(`[VFG] Native AOG HTTP Server listening on ${HTTP_BIND}:${HTTP_PORT} (for service_url http://<host>:${HTTP_PORT}/)`);
-    });
-    server.on('error', (err: any) => {
-      if (err && err.code === 'EADDRINUSE') console.log(`[VFG] Native HTTP port ${HTTP_PORT} in use`);
-      else console.log(`[VFG] Native HTTP error: ${err}`);
-    });
+    // Short deferral so plugin config (config.ini) is populated before resolution.
+    setTimeout(() => {
+      const HTTP_PORT = resolveHttpPort();
+      const HTTP_BIND = resolveHttpBind();
+      server.listen(HTTP_PORT, HTTP_BIND, () => {
+        console.log(`[VFG] Native AOG HTTP Server listening on ${HTTP_BIND}:${HTTP_PORT} (for service_url http://<host>:${HTTP_PORT}/)`);
+      });
+      server.on('error', (err: any) => {
+        if (err && err.code === 'EADDRINUSE') console.log(`[VFG] Native HTTP port ${HTTP_PORT} in use`);
+        else console.log(`[VFG] Native HTTP error: ${err}`);
+      });
+    }, 150);
   } catch (e) {
     console.log(`[VFG] Failed to start native HTTP server: ${e}`);
   }
