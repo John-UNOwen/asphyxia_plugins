@@ -2671,7 +2671,7 @@ export async function handle_req_draw_gacha(form: Record<string, string>, ctx: a
 
 export async function handle_get_gacha_result(form: Record<string, string>, ctx: any): Promise<void> {
   const times = Number(formGet(form, "times") || 1) || 1;
-  const rows = Array.from({ length: Math.max(1, times) }, () => `<data><character_id>0</character_id><unique_id>${Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}</unique_id></data>`).join("");
+  const rows = Array.from({ length: Math.max(1, Math.min(times, 25)) }, () => `<data><character_id>0</character_id><unique_id>${Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}</unique_id></data>`).join("");
   sendXml(ctx, xml_response(`<lottery_result>${rows}</lottery_result><gift><acquired>0</acquired><prev>0</prev><after>0</after></gift>`));
 }
 
@@ -2728,7 +2728,9 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
   // applied inside _gachaPool, to the advertised pools too, so a banner never
   // advertises odds over items it will not hand out.
 
-  let picks = rollGachaItems(pool, rates, Math.max(1, Math.min(playCount, 10)));
+  // Hosted-lane shop sells 1-pull and 20-pull (client GachaPlayUtility.Count);
+  // 25 is the accepted ceiling, above the shop's own maximum.
+  let picks = rollGachaItems(pool, rates, Math.max(1, Math.min(playCount, 25)));
   if (!picks.length) {
     // Never emit unknown OIDs: the client resolves every gain oid through
     // CutinItemMaster and an unresolvable one corrupts the saved inventory.
@@ -2738,7 +2740,7 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
       const std = (getGachaPools() as any)?.standard_pool || [];
       if (std.length) {
         const flat = { ...pool, items: [...std], buckets: {} };
-        picks = rollGachaItems(flat, gachaRates(gachaId, stype, flat), Math.max(1, Math.min(playCount, 10)));
+        picks = rollGachaItems(flat, gachaRates(gachaId, stype, flat), Math.max(1, Math.min(playCount, 25)));
       }
     } catch { }
   }
