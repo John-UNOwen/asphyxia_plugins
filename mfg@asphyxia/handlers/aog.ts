@@ -508,7 +508,7 @@ function battleItemXml(): string { return _battleItemXmlCache; }
 // income has to land in the server's "player_item" state exactly once.
 //
 // player_item mirrors MFG.GameData/PlayerItemGameData.cs as JsonUtility writes it:
-// {DataVersion:2, Items:[{ItemID, Count}]}, ItemID being the int value of
+// {DataVersion:2, Items:[{ItemID, m_count}]}, ItemID being the int value of
 // MFG.Types.PlayerItem.ItemID (ItemID.cs: None=0, Present01=1, FightSpiritW=11,
 // GachaTicket=12). DataVersion is kept at 2 so the client's v1 migration
 // (PlayerItemGameData.cs:124-141) never re-indexes the ids we wrote.
@@ -556,9 +556,23 @@ function setPresentInfos(profile: any, list: any[]): void {
   (profile as any).states.present_box_game = JSON.stringify({ DataVersion: 1, PresentInfos: list });
 }
 
+function normalizePlayerItems(obj: any): void {
+  // 2026-11-03 A3 fix: the client serializes PlayerItemInfo.Count as [SerializeField]
+  // m_count (PlayerItemInfo.cs), and JsonUtility drops unknown members. Entries written
+  // before this fix used `Count`, which the client could not see and then overwrote.
+  // Migrate on read so every stored entry speaks the client's spelling.
+  for (const x of obj.Items) {
+    if (!x) continue;
+    if (x.m_count === undefined && x.Count !== undefined) x.m_count = Number(x.Count) || 0;
+    if (x.m_count === undefined) x.m_count = 0;
+    delete x.Count;
+  }
+}
+
 function playerItemAdd(profile: any, itemID: number, count: number): { before: number; after: number } {
   const obj = parseStateJson(profile, "player_item") || { DataVersion: 2, Items: [] };
   if (!Array.isArray(obj.Items)) obj.Items = [];
+  normalizePlayerItems(obj);
   // Same migration the client runs on load (PlayerItemGameData.cs:124-141): a v1
   // save without GachaTicket has its FightSpirit09+ ids shifted by one. Doing it
   // here keeps the counts we write pointed at the right ItemID.
@@ -569,18 +583,18 @@ function playerItemAdd(profile: any, itemID: number, count: number): { before: n
   }
   obj.DataVersion = 2;
   let entry = obj.Items.find((x: any) => Number(x && x.ItemID) === itemID);
-  const before = entry ? Number(entry.Count) || 0 : 0;
-  if (!entry) { entry = { ItemID: itemID, Count: 0 }; obj.Items.push(entry); }
-  entry.Count = Math.max(0, before + Math.max(0, count));
+  const before = entry ? Number(entry.m_count) || 0 : 0;
+  if (!entry) { entry = { ItemID: itemID, m_count: 0 }; obj.Items.push(entry); }
+  entry.m_count = Math.max(0, before + Math.max(0, count));
   if (!(profile as any).states) (profile as any).states = {};
   (profile as any).states.player_item = JSON.stringify(obj);
-  return { before, after: entry.Count };
+  return { before, after: entry.m_count };
 }
 
 function playerItemCount(profile: any, itemID: number): number {
   const obj = parseStateJson(profile, "player_item");
   const entry = obj && Array.isArray(obj.Items) ? obj.Items.find((x: any) => Number(x && x.ItemID) === itemID) : null;
-  return entry ? Number(entry.Count) || 0 : 0;
+  return entry ? Number(entry.m_count ?? entry.Count) || 0 : 0;
 }
 
 // Grant every pending auto-apply present once, server-side, and mark it received

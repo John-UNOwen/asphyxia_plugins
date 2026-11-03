@@ -1,7 +1,7 @@
-Mahjong Fight Girl
+mfg@asphyxia
 ===
 
-The supported version VFG-2026060900.
+Server plugin for the arcade title this repo reconstructs. Supported build: 2026060900.
 
 - Online matching (plus private passphrase matches)
 - CPU opponents (instant solo tables in 2-player mode)
@@ -26,6 +26,10 @@ schedules, name and table-stamp screening.
 Not implemented: block lists, competitions (`competition_entry` answers "not entered" and
 `competition_game` is an empty record), MG / jongstone economy, pro opponents, a dated content
 calendar.
+
+## Hosted lane (2026-11)
+
+The public deployment: a WebFront gate (repo `webfront/`, behind a Cloudflare tunnel) fronts the core WebUI signup/login (bcrypt sessions; usernames case-insensitive - lowercased at signup and on lookup) and holds everything behind one access code. The gate validates `connect.sid` against core `GET /api/me`, pins each session's own DataID into the play page (`-REGULAR -DATAID=...`), and relays the WebGL client's xrpc traffic as plain HTTP under `/aog`. On a relayed login the gate presents that session's own DataID to this plugin through `vfgcard_present`, guarded by a shared `VFG_PRESENTER_SECRET`; a `profile.card_id` binding lands only for ids that carry a core card document (signup mints one per account). The gacha shop sells 1-pull and 20-pull; this server accepts at most 25 pulls per request. The native listener takes `mfg_http_bind` (hosted posture: 127.0.0.1). Delivery matrix: repo docs/28; open defects incl. the anonymous profile-page relay: repo docs/29.
 
 ## Content data files
 
@@ -68,11 +72,11 @@ Two kinds of account, told apart by one field, `profile.card_id`:
 - **Card-less** (no `profile.card_id`): there is nothing on the account for the server to check, so
   **cross-account isolation is out of the trust model for these accounts**. On this private
   self-host that is the intended guest model, not an oversight: bearer refid on a LAN is what the
-  WebGL / browser lanes use — they log in with a fixed dataid (`MFGTESTGUEST1` under `-AUTOSERVE`,
+  dev lane uses — it logs in with a fixed dataid (`MFGTESTGUEST1` under `-AUTOSERVE`,
   `AccountGameData.cs:70-74`), card + PIN exists only on the PCB/native line
   (`VFG_CARDMNG_MODE=compat`), and no card credential is invented for a guest account. Measured on
   the live savedata of this deployment: 118 profile documents, 0 carrying `card_id`
-  (`tmp/p11acct/probe_accounts.cjs`), so the credential branch is dormant here and the rule below is
+  (`tmp/p11acct/probe_accounts.cjs`), so the credential branch is dormant in that snapshot; since then the hosted lane mints a core card document per signup and binds it at login through `vfgcard_present` (see Hosted lane above), while on the LAN dev lane the rule below is
   the one actually running.
 
 For a card-less account the live session is the only thing naming its owner, so an unauthenticated
