@@ -1546,6 +1546,26 @@ export async function handle_client_state_read(form: Record<string, string>, ctx
         }
       } catch { }
     }
+    // A3 follow-through (2026-11-03): player_item used to be served with its
+    // stored bytes as-is, so the 136 docs still spelled Count stayed invisible
+    // to the client until some grant touched them. Normalize on the serve path
+    // too and persist the migrated copy.
+    if (kind === "player_item" && profile) {
+      try {
+        const pi = JSON.parse(String(sanitized).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ""));
+        if (pi && Array.isArray(pi.Items)) {
+          normalizePlayerItems(pi);
+          const migrated = JSON.stringify(pi);
+          if (migrated !== sanitized) {
+            sanitized = migrated;
+            if (!(profile as any).states) (profile as any).states = {};
+            (profile as any).states[kind] = migrated;
+            healed = true;
+            vlog(`[VFG] normalized player_item on read mid=${mid} entries=${pi.Items.length}`);
+          }
+        }
+      } catch { }
+    }
     let b64 = "";
     try { b64 = Buffer.from(sanitized, "utf-8").toString("base64"); } catch { b64 = ""; }
     chunks.push(`<state kind="${xml_escape(kind)}"><data>${b64}</data></state>`);
@@ -2685,7 +2705,7 @@ export async function handle_req_draw_gacha(form: Record<string, string>, ctx: a
 
 export async function handle_get_gacha_result(form: Record<string, string>, ctx: any): Promise<void> {
   const times = Number(formGet(form, "times") || 1) || 1;
-  const rows = Array.from({ length: Math.max(1, Math.min(times, 25)) }, () => `<data><character_id>0</character_id><unique_id>${Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}</unique_id></data>`).join("");
+  const rows = Array.from({ length: Math.max(1, Math.min(times, 5)) }, () => `<data><character_id>0</character_id><unique_id>${Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}</unique_id></data>`).join("");
   sendXml(ctx, xml_response(`<lottery_result>${rows}</lottery_result><gift><acquired>0</acquired><prev>0</prev><after>0</after></gift>`));
 }
 
@@ -2742,9 +2762,10 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
   // applied inside _gachaPool, to the advertised pools too, so a banner never
   // advertises odds over items it will not hand out.
 
-  // Hosted-lane shop sells 1-pull and 20-pull (client GachaPlayUtility.Count);
-  // 25 is the accepted ceiling, above the shop's own maximum.
-  let picks = rollGachaItems(pool, rates, Math.max(1, Math.min(playCount, 25)));
+  // Shop sells 1-pull and 5-pull (client GachaPlayUtility.Count). Clamp to the
+  // shop's own maximum: the 25 ceiling belonged to the reverted 20-pull experiment.
+  const wanted = Math.max(1, Math.min(playCount, 5));
+  let picks = rollGachaItems(pool, rates, wanted);
   if (!picks.length) {
     // Never emit unknown OIDs: the client resolves every gain oid through
     // CutinItemMaster and an unresolvable one corrupts the saved inventory.
@@ -2754,7 +2775,7 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
       const std = (getGachaPools() as any)?.standard_pool || [];
       if (std.length) {
         const flat = { ...pool, items: [...std], buckets: {} };
-        picks = rollGachaItems(flat, gachaRates(gachaId, stype, flat), Math.max(1, Math.min(playCount, 25)));
+        picks = rollGachaItems(flat, gachaRates(gachaId, stype, flat), wanted);
       }
     } catch { }
   }
@@ -2804,15 +2825,18 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
       gift++;
       configGifts++;
     } else if (giftGate && !selectable && giftMode === "none") {
-      // The client would run GachaResultInfo.cs:130 with cutinItems[-1] here
-      // (unowned cutin, unselectable girl, state neither Get nor Gift): an
-      // IndexOutOfRange in the results flow. Pay gift points and keep the item
-      // out of gain_items. GachaSelectFlow.cs:598 forces Get/Gift before any
-      // Pickup pull, so this is the guard, not the path.
-      unpayable++;
+      // Gacha robustness patch (2026-11-03): this branch used to DROP the item
+      // from <gain_items> - the client iterates the play scene off the mode
+      // count (GachaPlayFlow GachaDirection), so a short payout froze the scene
+      // (19 draws in the log dropped all 5). State None now falls back to Gift
+      // semantics: deliver as ConfigGift (gift_type 2, not owned anywhere),
+      // the client grants nothing for it and the payout length always matches
+      // play_count. The client-side gates (Get/Gift window on Pickup banners,
+      // cutinItems[-1] guard) close the other half of the hole.
+      giftType = 2;
       gift++;
-      try { vlog(`[VFG] gacha_draw dropped ${randomOid}: gift_config none, chara ${chara} not selectable`); } catch { }
-      continue;
+      configGifts++;
+      try { vlog(`[VFG] gacha_draw gift-converted ${randomOid}: gift_config none, chara ${chara} not selectable`); } catch { }
     } else {
       granted.push(randomOid);
     }
@@ -2834,6 +2858,9 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
     // if the client's state write never arrives.
     const unlocked = grantGachaUnlockOnDraw(profile, randomOid);
     if (unlocked !== null) unlockedChars.push(unlocked);
+  }
+  if (giftTypes.length !== wanted) {
+    console.log(`[VFG] WARN gacha_draw payout length ${giftTypes.length} != requested ${wanted} (id=${gachaId})`);
   }
   let giftCount = playerItemCount(profile, PI_PRESENT01);
   if (profile) {
