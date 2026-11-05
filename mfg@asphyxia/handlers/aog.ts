@@ -364,20 +364,58 @@ function ensureSharedTable(tid: number, taku: number, human_seats?: number[], ta
 // GMODE_TENBO x seats that no game produced.
 // Returns null when the addressed table is not this seat's table; the caller
 // answers SERV_ST_NO_TABLE, which is what the client's match flow handles.
-export function addressedSeat(pcuid: string, tid: number, claimedPindex: number, tag: string): PlayerSeat | null {
+export async function matchSeat(pcuid: string, tid: number, claimedPindex: number, tag: string): Promise<PlayerSeat | null> {
   const seat = PLAYER_SEAT.get(pcuid) || null;
-  if (!seat || !tid || Number(seat.tid) !== Number(tid)) {
-    vlog(`[VFG] ${tag} no table behind tid=${tid} pcuid=${String(pcuid).slice(0, 8)}... ` +
-      `(seat=${seat ? seat.tid : "none"}) -> serv_st ${SERV_ST_NO_TABLE}`);
-    return null;
+  if (seat && tid && Number(seat.tid) === Number(tid)) {
+    if (claimedPindex >= 0 && Number(seat.pindex) !== Number(claimedPindex)) {
+      // The server's seat assignment wins; logged so a client that addresses a seat
+      // it was never given is visible instead of silently served.
+      vlog(`[VFG] ${tag} client claimed pindex=${claimedPindex} at tid=${tid}, server seat is ${seat.pindex}`);
+    }
+    (seat as any).lastSeen = Date.now();
+    return seat;
   }
-  if (claimedPindex >= 0 && Number(seat.pindex) !== Number(claimedPindex)) {
-    // The server's seat assignment wins; logged so a client that addresses a seat
-    // it was never given is visible instead of silently served.
-    vlog(`[VFG] ${tag} client claimed pindex=${claimedPindex} at tid=${tid}, server seat is ${seat.pindex}`);
+
+  // A match seat belongs to the account, not to the session that first took it. VFG_
+  // ACCOUNT_AUTH=card with VFG_SESSION_TAKEOVER_GRACE=0 retires an account's session the
+  // moment that account logs in again - a page reload, a card re-present - and the seat
+  // stays recorded against the session that is now dead. The lane keeps its seat and its
+  // polls, so the request that arrives has no seat of its own at a table this account is
+  // still sitting at. Move the seat to the session that is asking for it; answering
+  // SERV_ST_NO_TABLE instead drops a live player out of the match.
+  let prof: any = null;
+  try { prof = await getProfileBySession(pcuid); } catch { prof = null; }
+  const refid = normalizeRefid(String((prof as any)?.refid || ""));
+  if (refid && tid) {
+    let held: { pcuid: string; seat: PlayerSeat } | null = null;
+    for (const [otherPcuid, other] of PLAYER_SEAT.entries()) {
+      if (Number(other.tid) !== Number(tid)) continue;
+      if (normalizeRefid(String((other as any).refid || "")) !== refid) continue;
+      if (!held || seatSeen(other) > seatSeen(held.seat)) held = { pcuid: String(otherPcuid), seat: other };
+    }
+    if (held) {
+      const heldKey = String((held.seat as any).lobbyKey || "");
+      const heldLobby = MATCH_LOBBY.get(heldKey);
+      if (heldLobby && Number(heldLobby.tid) === Number(held.seat.tid)) {
+        // The member list is the room. A seat moved to a new session has to move in that
+        // list too, or the next prune drops the member and renumbers the seats under the
+        // players that are still sitting in them.
+        const at = heldLobby.pcuids.indexOf(held.pcuid);
+        if (at >= 0) heldLobby.pcuids[at] = String(pcuid);
+        else heldLobby.pcuids.push(String(pcuid));
+      }
+      PLAYER_SEAT.delete(held.pcuid);
+      PLAYER_SEAT.set(String(pcuid), held.seat);
+      (held.seat as any).lastSeen = Date.now();
+      vlog(`[VFG] ${tag} tid=${tid} seat ${held.seat.pindex} (${held.seat.name}) moves to this account's ` +
+        `new session ${String(pcuid).slice(0, 8)}...`);
+      return held.seat;
+    }
   }
-  (seat as any).lastSeen = Date.now();
-  return seat;
+
+  vlog(`[VFG] ${tag} no table behind tid=${tid} pcuid=${String(pcuid).slice(0, 8)}... ` +
+    `(seat=${seat ? seat.tid : "none"}) -> serv_st ${SERV_ST_NO_TABLE}`);
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -388,20 +426,44 @@ export function addressedSeat(pcuid: string, tid: number, claimedPindex: number,
 // re-login leaves the retired session's seat sitting next to the live one, and a
 // plain scan of the map hands out whichever was inserted first. The live seat is the
 // one whose session has not been retired and, of those, the one polled most recently.
-function seatAt(tid: number, index: number): { pcuid: string; seat: PlayerSeat; evicted: boolean } | null {
-  let live: { pcuid: string; seat: PlayerSeat; evicted: boolean } | null = null;
-  let dead: { pcuid: string; seat: PlayerSeat; evicted: boolean } | null = null;
+// A seat is empty when nobody has addressed it for a matching window. A retired session
+// is not that proof: a lane whose page reloaded, or whose card was re-presented, has a
+// fresh session on the account and goes on polling with the one it already holds in
+// memory. Demoting the seat it is polling freezes that lane's own waiting screen and
+// takes a live player off every other client's table. The window is the matching window
+// the client itself counts down, which is also what the disconnect conversion below uses.
+const SEAT_SILENCE_MS = LOBBY_FORCE_SECONDS * 1000;
+
+function seatSeen(seat: PlayerSeat | null): number {
+  const seen = Number((seat as any)?.lastSeen || 0);
+  return seen > 0 ? seen : Date.now();
+}
+
+function seatIsSilent(seat: PlayerSeat | null): boolean {
+  if (!seat) return true;
+  return Date.now() - seatSeen(seat) > SEAT_SILENCE_MS;
+}
+
+// The seat a table+index is held by, and how firmly. PLAYER_SEAT is keyed by session, so
+// a re-login leaves the retired session's seat next to a live one and a plain scan hands
+// out whichever was inserted first. A seat that is being polled outranks one that is not;
+// within that, a session that has not been retired outranks one that has; within that,
+// whichever was polled last.
+function seatAt(tid: number, index: number): { pcuid: string; seat: PlayerSeat; evicted: boolean; silent: boolean } | null {
+  let best: { pcuid: string; seat: PlayerSeat; evicted: boolean; silent: boolean } | null = null;
+  let bestRank = -1;
   for (const [pcuid, seat] of PLAYER_SEAT.entries()) {
     if (Number(seat.tid) !== Number(tid) || Number(seat.pindex) !== Number(index)) continue;
     const evicted = isEvictedSession(String(pcuid));
-    const cand = { pcuid: String(pcuid), seat, evicted };
-    const seen = Number((seat as any).lastSeen || 0);
-    const best = evicted ? dead : live;
-    if (!best || seen > Number((best.seat as any).lastSeen || 0)) {
-      if (evicted) dead = cand; else live = cand;
+    const silent = seatIsSilent(seat);
+    const cand = { pcuid: String(pcuid), seat, evicted, silent };
+    const rank = (silent ? 0 : 2) + (evicted ? 0 : 1);
+    if (!best || rank > bestRank || (rank === bestRank && seatSeen(seat) > seatSeen(best.seat))) {
+      best = cand;
+      bestRank = rank;
     }
   }
-  return live || dead;
+  return best;
 }
 
 // A lobby only means something while its members are still sitting in it. Membership
@@ -422,7 +484,10 @@ async function pruneLobbyMembers(lobbyKey: string, lobby: { pcuids: string[]; ti
       dropped.push(pcuid);
       continue;
     }
-    if (isEvictedSession(pcuid)) {
+    if (seatIsSilent(seat)) {
+      // An entry left behind by a lane that is no longer addressing the room: the same
+      // window the engine gives a seat before handing it to a CPU. A seat that is being
+      // polled stays, including one whose session a relogin retired.
       PLAYER_SEAT.delete(pcuid);
       dropped.push(pcuid);
       continue;
@@ -457,7 +522,7 @@ async function pruneLobbyMembers(lobbyKey: string, lobby: { pcuids: string[]; ti
     vlog(`[VFG] ${tag} lobby=${lobbyKey} tid=${lobby.tid} re-seated ${renumbered.join(" ")}`);
   }
   if (dropped.length) {
-    vlog(`[VFG] ${tag} lobby=${lobbyKey} tid=${lobby.tid} released ${dropped.length} seat(s) nobody holds, ${live.length} live member(s)`);
+    vlog(`[VFG] ${tag} lobby=${lobbyKey} tid=${lobby.tid} released ${dropped.length} seat(s) nobody is polling, ${live.length} seated member(s)`);
   }
   return live;
 }
@@ -477,7 +542,10 @@ async function returningSeat(
   let best: { pcuid: string; seat: PlayerSeat } | null = null;
   for (const [heldPcuid, seat] of PLAYER_SEAT.entries()) {
     if (normalizeRefid(String((seat as any).refid || "")) !== mine) continue;
-    if (isEvictedSession(String(heldPcuid))) continue;
+    // A seat whose session a relogin retired is still this account's seat as long as
+    // somebody is polling it. Once it goes quiet it is a leftover from a lane that is
+    // gone, and seating the account fresh is the right answer.
+    if (isEvictedSession(String(heldPcuid)) && seatIsSilent(seat)) continue;
     const heldTid = Number(seat.tid) || 0;
     if (!heldTid) continue;
     if (Number((seat as any).gmode) !== Number(gmode)) continue;
@@ -2480,6 +2548,7 @@ function sendDiscordWebhook(url: string, payload: any) {
     pindex = lobby.pcuids.indexOf(pcuid);
     tid = lobby.tid;
     PLAYER_SEAT.set(pcuid, { tid: lobby.tid, pindex, name, mid, profile, lobbyKey, gmode, taku_class, refid, guest, scramble });
+    (PLAYER_SEAT.get(pcuid) as any).lastSeen = Date.now();
     // Which table this entry landed in and which seat it was given: without this a
     // matching run cannot be read back at all, and "did these lanes share a table" is
     // the first question any waiting-room report has to answer.
@@ -2523,7 +2592,7 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
   const claimedPindex = mustInt(parts, 3, -1);
   const nextSno = mustInt(parts, 5, 0);
 
-  const seatInfo = addressedSeat(pcuid, tid, claimedPindex, "gget");
+  const seatInfo = await matchSeat(pcuid, tid, claimedPindex, "gget");
   if (!seatInfo) {
     sendXml(ctx, xml_error(SERV_ST_NO_TABLE));
     return;
@@ -2574,6 +2643,13 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
         } else if (now - (h_info as any).lastSeen > 60000) {
           vlog(`[VFG] Player ${h_info.name} in seat ${h_seat} disconnected for >60s. Converting to CPU.`);
           (table as any).humans.splice(i, 1);
+          if (heldSeat && heldSeat.evicted) {
+            // Away and no live session stands behind the seat any more: this lane is not
+            // coming back to this table, so the seat itself is released. A seat that is
+            // only silent keeps its record - reconnect hands that seat back to the player.
+            PLAYER_SEAT.delete(heldSeat.pcuid);
+            vlog(`[VFG] tid=${seatInfo.tid} seat ${h_seat} released: no session behind it`);
+          }
           
           if ((table as any).state === "discard" && (table as any).turn === h_seat) {
             (table as any)._cpu_turn(h_seat);
@@ -2615,15 +2691,17 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
     for (let i = 0; i < seats; i++) {
       if (!humanSeats.has(i)) { players.push(null); continue; }
       const held = seatAt(seatInfo.tid, i);
-      if (!held || held.evicted) {
-        // Nobody is sitting at this seat any more. The engine would still wait on it
-        // for a discard no client is going to send, so it goes to the CPU the table
-        // will actually play - out of the table's own human list and out of the
-        // answer, in the same breath, so both sides describe the same seat.
-        if (held) PLAYER_SEAT.delete(held.pcuid);
+      if (!held || held.silent) {
+        // Nothing has addressed this seat for a whole matching window. The engine would
+        // wait on it for a discard nobody is going to send, so it goes to the CPU the
+        // table will actually play - out of the table's own human list and out of the
+        // answer in the same breath, so both sides describe the same seat. A seat that is
+        // still being polled stays a human seat whatever happened to the session that
+        // first took it.
+        if (held && held.evicted) PLAYER_SEAT.delete(held.pcuid);
         (table as any).humans = ((table as any).humans || []).filter((h: any) => Number(h) !== i);
         humanSeats.delete(i);
-        vlog(`[VFG] gget tid=${seatInfo.tid} seat ${i} has no live seat behind it, handed to CPU`);
+        vlog(`[VFG] gget tid=${seatInfo.tid} seat ${i} unaddressed for ${SEAT_SILENCE_MS / 1000}s, handed to CPU`);
         players.push(null);
         continue;
       }
@@ -2677,7 +2755,7 @@ export async function handle_gpost(form: Record<string, string>, ctx: any): Prom
   const reach = mustInt(parts, 12, 0);
   const tsumogiri = mustInt(parts, 13, 0);
 
-  const seatInfo = addressedSeat(pcuid, tid, claimedPindex, "gpost");
+  const seatInfo = await matchSeat(pcuid, tid, claimedPindex, "gpost");
   if (!seatInfo) {
     sendXml(ctx, xml_error(SERV_ST_NO_TABLE));
     return;
@@ -2694,7 +2772,7 @@ export async function handle_gpost(form: Record<string, string>, ctx: any): Prom
 
   const start = table.cells.length;
   // The seat the server assigned at entry is authoritative over the pindex the
-  // request claims (addressedSeat logs the difference).
+  // request claims (matchSeat logs the difference).
   table.on_command(kind, seatInfo.pindex, pai, tepai_id, tepai_id2, reach, tsumogiri);
   
   // flush if needed for certain kinds
@@ -2717,7 +2795,7 @@ export async function handle_end_or_kiken(form: Record<string, string>, ctx: any
   // is whatever the table was entered with.
   const tid = Number(formGet(form, "tid") || 0) || 0;
   const claimedPindex = Number(formGet(form, "pindex") || 0) || 0;
-  const seatInfo = addressedSeat(pcuid, tid, claimedPindex, "end_game");
+  const seatInfo = await matchSeat(pcuid, tid, claimedPindex, "end_game");
   if (!seatInfo) {
     sendXml(ctx, xml_error(SERV_ST_NO_TABLE));
     return;
@@ -2813,10 +2891,10 @@ export async function handle_gchat(form: Record<string, string>, ctx: any): Prom
   const tid = Number(formGet(form, "tid") || 0) || 0;
   // The seat a sticker belongs to is the seat this session was seated at, not the
   // pindex the request claims. Every other match request resolves the seat this way
-  // (addressedSeat); gchat was the one handler that took the claim on faith, so a
+  // (matchSeat); gchat was the one handler that took the claim on faith, so a
   // lane whose seat had moved posted its stickers onto somebody else's seat where
   // every other player could see them.
-  const seatInfo = addressedSeat(pcuid, tid, Number(formGet(form, "pindex") || 0), "gchat");
+  const seatInfo = await matchSeat(pcuid, tid, Number(formGet(form, "pindex") || 0), "gchat");
   if (!seatInfo) {
     sendXml(ctx, xml_error(SERV_ST_NO_TABLE));
     return;
@@ -2858,7 +2936,7 @@ export async function handle_gget_stamp_info(form: Record<string, string>, ctx: 
   // Same seat rule as /gchat: the sticker lands on the seat this session holds.
   const pcuid = formGet(form, "pcuid");
   if (pcuid) {
-    const seatInfo = addressedSeat(pcuid, tid, pindex, "gget_stamp_info");
+    const seatInfo = await matchSeat(pcuid, tid, pindex, "gget_stamp_info");
     if (seatInfo) { pindex = Number(seatInfo.pindex) || 0; mid = Number(seatInfo.mid || 0) || 0; }
   }
   const info = (formGet(form, "stamp_info") || "").split(",");
