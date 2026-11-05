@@ -2815,21 +2815,28 @@ export async function handle_end_or_kiken(form: Record<string, string>, ctx: any
 
   if (isKiken) {
     const quitSeat = seatInfo.pindex;
-    // MahjongPlayFlow.cs:758-768 posts the KIKEN command (kind 13) and then this endpoint.
-    // Table.resign() settles the seat behind every seat that plays the match out - the auto
-    // loss 棄和 is supposed to be - and leaves the seat to the CPU for the rest of the match.
-    (table as any).resign(quitSeat);
-    vlog(`[VFG] ${tag} tid=${seatInfo.tid} seat ${quitSeat} (${seatInfo.name}) resigned: ` +
-      `settled last, seat handed to CPU`);
-    // The seat record goes with the player, so a re-login cannot take back a seat that was
-    // given up. The archive still has to know who sat there.
-    (table as any).seat_quit = (table as any).seat_quit || {};
-    (table as any).seat_quit[quitSeat] = {
-      name: seatInfo.name,
-      mid: Number(seatInfo.mid || 0) || 0,
-      refid: String((seatInfo as any).refid || ""),
-      guest: !!(seatInfo as any).guest,
-    };
+    if (naturalFinish) {
+      // The engine already played the match out: that settlement stands whatever a late exit
+      // press does, so a seat that finished where it finished is not moved behind the others.
+      vlog(`[VFG] ${tag} tid=${seatInfo.tid} seat ${quitSeat} resigned after the match already ` +
+        `ended: settled as played`);
+    } else {
+      // MahjongPlayFlow.cs:758-768 posts the KIKEN command (kind 13) and then this endpoint.
+      // Table.resign() settles the seat behind every seat that plays the match out - the auto
+      // loss 棄和 is supposed to be - and leaves the seat to the CPU for the rest of the match.
+      (table as any).resign(quitSeat);
+      vlog(`[VFG] ${tag} tid=${seatInfo.tid} seat ${quitSeat} (${seatInfo.name}) resigned: ` +
+        `settled last, seat handed to CPU`);
+      // The seat record goes with the player, so a re-login cannot take back a seat that was
+      // given up. The archive still has to know who sat there.
+      (table as any).seat_quit = (table as any).seat_quit || {};
+      (table as any).seat_quit[quitSeat] = {
+        name: seatInfo.name,
+        mid: Number(seatInfo.mid || 0) || 0,
+        refid: String((seatInfo as any).refid || ""),
+        guest: !!(seatInfo as any).guest,
+      };
+    }
   }
 
   // Only a match the engine finished at its last kyoku is archived. A resign mid-match is not
