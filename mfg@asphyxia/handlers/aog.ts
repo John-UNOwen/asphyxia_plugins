@@ -62,6 +62,7 @@ import {
   CARD_STORE_BY_REFID,
   allocateTid,
   STAMPS,
+  STAMP_CURSOR,
   _stampSeq,
   incStampSeq,
   stampCursor,
@@ -270,17 +271,21 @@ function mgresultXml(table: Table, viewerPindex: number = -1): string {
 }
 
 function matchingXml(tid: number, seats: number, myPindex: number, players: Array<{ pcuid: string; mid: number; name: string; profile: any }>, isMatched: boolean, scrambleSchool: string = ""): string {
-  const pnum = players.length;
+  // <pnum> is the human count and <cpu_num> the CPU count, and the client adds the
+  // two to decide how many seats it parses at all (MatchingData.cs:33-35,76-81). A
+  // member slot no session holds is a CPU seat, so counting it into pnum made a
+  // three-human table announce four humans and no CPU, and the seat the engine drove
+  // as a CPU was announced to every client as a player.
+  const humans = players.filter((p) => !!p);
+  const pnum = humans.length;
   const cpu_n = Math.max(0, seats - pnum);
-  let used = 1;
-  const myProfile = players[myPindex]?.profile || {};
-  try {
-    const pg = JSON.parse(myProfile.states?.player_game || "{}");
-    used = Number(pg.SelectChara || 0) + 1;
-  } catch { used = 1; }
   
+  // The opponent picked for a CPU seat is chosen against the human seats' own
+  // characters. Reading the polling client's character instead made the same table
+  // present a different character in the same seat to each client - the CPU was a
+  // different girl on every screen.
   const usedChars = new Set<number>();
-  for (const p of players) {
+  for (const p of humans) {
     if (p && p.profile) {
       try {
         const pg = JSON.parse(p.profile.states?.player_game || "{}");
@@ -299,7 +304,7 @@ function matchingXml(tid: number, seats: number, myPindex: number, players: Arra
       epdataXml.push(`<epdata_${i}><name>${xml_escape(p.name)}</name><mid>${p.mid}</mid></epdata_${i}>`);
     } else if (isMatched) {
       let cpuChara = (tid + i * 7) % 19 + 1;
-      while (usedChars.has(cpuChara) || cpuChara === used) {
+      while (usedChars.has(cpuChara)) {
         cpuChara = (cpuChara % 19) + 1;
       }
       usedChars.add(cpuChara);
@@ -376,10 +381,156 @@ export function addressedSeat(pcuid: string, tid: number, claimedPindex: number,
 }
 
 // ---------------------------------------------------------------------------
+// seat liveness
+// ---------------------------------------------------------------------------
+
+// The seat a table+index is really held by. PLAYER_SEAT is keyed by session, so a
+// re-login leaves the retired session's seat sitting next to the live one, and a
+// plain scan of the map hands out whichever was inserted first. The live seat is the
+// one whose session has not been retired and, of those, the one polled most recently.
+function seatAt(tid: number, index: number): { pcuid: string; seat: PlayerSeat; evicted: boolean } | null {
+  let live: { pcuid: string; seat: PlayerSeat; evicted: boolean } | null = null;
+  let dead: { pcuid: string; seat: PlayerSeat; evicted: boolean } | null = null;
+  for (const [pcuid, seat] of PLAYER_SEAT.entries()) {
+    if (Number(seat.tid) !== Number(tid) || Number(seat.pindex) !== Number(index)) continue;
+    const evicted = isEvictedSession(String(pcuid));
+    const cand = { pcuid: String(pcuid), seat, evicted };
+    const seen = Number((seat as any).lastSeen || 0);
+    const best = evicted ? dead : live;
+    if (!best || seen > Number((best.seat as any).lastSeen || 0)) {
+      if (evicted) dead = cand; else live = cand;
+    }
+  }
+  return live || dead;
+}
+
+// A lobby only means something while its members are still sitting in it. Membership
+// is append-only and a seat is released in exactly one place - end_game, which this
+// client never posts - so a refresh or an abandoned lane leaves the old session's
+// seat in the room. The lobby then fills on ghosts, every ghost becomes a human seat,
+// and a ghost has no account behind it to render: that is how one account ends up in
+// two seats (match archive tid 1073 records one mid in seats 0 and 1) and how a
+// stranger sees a nameless default girl across the table.
+async function pruneLobbyMembers(lobbyKey: string, lobby: { pcuids: string[]; tid: number }, tag: string): Promise<string[]> {
+  const live: string[] = [];
+  const taken = new Map<string, string>();
+  const dropped: string[] = [];
+  for (const raw of lobby.pcuids) {
+    const pcuid = String(raw);
+    const seat = PLAYER_SEAT.get(pcuid);
+    if (!seat || Number(seat.tid) !== Number(lobby.tid) || String(seat.lobbyKey || "") !== String(lobbyKey)) {
+      dropped.push(pcuid);
+      continue;
+    }
+    if (isEvictedSession(pcuid)) {
+      PLAYER_SEAT.delete(pcuid);
+      dropped.push(pcuid);
+      continue;
+    }
+    const refid = normalizeRefid(String((seat as any).refid || ""));
+    if (refid && taken.has(refid)) {
+      // The same account holding two seats because it logged in twice: the newer
+      // session's seat is the one that stays.
+      const older = taken.get(refid) as string;
+      PLAYER_SEAT.delete(older);
+      dropped.push(older);
+      taken.set(refid, pcuid);
+      live.push(pcuid);
+      continue;
+    }
+    if (refid) taken.set(refid, pcuid);
+    live.push(pcuid);
+  }
+  // A lobby's seat numbers are positions in this list (entry hands out pcuids.indexOf,
+  // the table that forms maps the same positions), so dropping a member renumbers the
+  // room. Leaving a live seat recorded at the index it no longer has is how one index
+  // ends up claimed twice while another is held by nobody.
+  const renumbered: string[] = [];
+  for (let i = 0; i < live.length; i++) {
+    const seat = PLAYER_SEAT.get(live[i]);
+    if (!seat || Number(seat.pindex) === i) continue;
+    renumbered.push(`${seat.pindex}->${i}`);
+    seat.pindex = i;
+  }
+  lobby.pcuids = live;
+  if (renumbered.length) {
+    vlog(`[VFG] ${tag} lobby=${lobbyKey} tid=${lobby.tid} re-seated ${renumbered.join(" ")}`);
+  }
+  if (dropped.length) {
+    vlog(`[VFG] ${tag} lobby=${lobbyKey} tid=${lobby.tid} released ${dropped.length} seat(s) nobody holds, ${live.length} live member(s)`);
+  }
+  return live;
+}
+
+// The seat this account is still holding in a room that is still alive. A waiting
+// screen that reloads posts entry_game again with a fresh session, and the lane was
+// then seated in a brand new table while the three it left kept waiting on a seat
+// nobody held: one lane got a room of its own, the other three got the hole it left.
+// A lobby answer falls through so the ordinary path seats the new session at the same
+// index; a table answer is returned straight to the client.
+async function returningSeat(
+  refid: string, pcuid: string, lobbyKey: string, name: string, mid: number, profile: any,
+  gmode: number, taku_class: number, guest: boolean, scramble: string,
+): Promise<{ tid: number; pindex: number } | null> {
+  const mine = normalizeRefid(String(refid || ""));
+  if (!mine) return null;
+  let best: { pcuid: string; seat: PlayerSeat } | null = null;
+  for (const [heldPcuid, seat] of PLAYER_SEAT.entries()) {
+    if (normalizeRefid(String((seat as any).refid || "")) !== mine) continue;
+    if (isEvictedSession(String(heldPcuid))) continue;
+    const heldTid = Number(seat.tid) || 0;
+    if (!heldTid) continue;
+    if (Number((seat as any).gmode) !== Number(gmode)) continue;
+    const heldKey = String((seat as any).lobbyKey || "");
+    const lobby = MATCH_LOBBY.get(heldKey);
+    const inLobby = !!lobby && Number(lobby.tid) === heldTid;
+    const onTable = SHARED_TABLES.has(heldTid);
+    if (!inLobby && !onTable) continue;   // that room is gone; a fresh one is correct
+    if (inLobby && heldKey !== String(lobbyKey)) continue; // a different room on purpose
+    const seen = Number((seat as any).lastSeen || 0);
+    if (!best || seen > Number((best.seat as any).lastSeen || 0)) best = { pcuid: String(heldPcuid), seat };
+  }
+  if (!best) return null;
+  const backTid = Number(best.seat.tid);
+  const backIndex = Number(best.seat.pindex) || 0;
+  const backKey = String((best.seat as any).lobbyKey || lobbyKey);
+  if (String(best.pcuid) !== String(pcuid)) {
+    const backLobby = MATCH_LOBBY.get(backKey);
+    if (backLobby && Number(backLobby.tid) === backTid) {
+      const at = backLobby.pcuids.indexOf(String(best.pcuid));
+      if (at >= 0) backLobby.pcuids[at] = String(pcuid);
+      else backLobby.pcuids.push(String(pcuid));
+    }
+    PLAYER_SEAT.delete(String(best.pcuid));
+    PLAYER_SEAT.set(String(pcuid), {
+      tid: backTid, pindex: backIndex, name, mid, profile, lobbyKey: backKey,
+      gmode, taku_class, refid, guest, scramble,
+    });
+  }
+  vlog(`[VFG] entry back to tid=${backTid} seat=${backIndex} of mode ${gmode}: the room this account left is still live`);
+  if (SHARED_TABLES.has(backTid)) return { tid: backTid, pindex: backIndex };
+  return null;
+}
+
+// A seat carries the profile its session had at entry_game. When that copy cannot
+// describe a player at all, the seat's account is re-read from the store by refid.
+// This is a read only: player_game and customize_item are client-owned state and are
+// never rewritten here.
+async function seatProfile(seat: PlayerSeat): Promise<any | null> {
+  const held = (seat as any).profile;
+  if (held && held.states && held.states.player_game) return held;
+  const refid = normalizeRefid(String((seat as any).refid || ""));
+  if (!refid) return held || null;
+  const fresh = await getProfileByRefid(refid);
+  if (fresh) (seat as any).profile = fresh;
+  return fresh || held || null;
+}
+
+// ---------------------------------------------------------------------------
 // stamps
 // ---------------------------------------------------------------------------
-function stampPost(tid: number, mid: number, pindex: number, name: string, contents: string, param: string): void {
-  if (!contents) return;
+function stampPost(tid: number, mid: number, pindex: number, name: string, contents: string, param: string): number {
+  if (!contents) return 0;
   const idx = incStampSeq();
   const room = STAMPS.get(tid) || [];
   room.push({
@@ -394,6 +545,21 @@ function stampPost(tid: number, mid: number, pindex: number, name: string, conte
   // keep last 40
   if (room.length > 40) room.splice(0, room.length - 40);
   STAMPS.set(tid, room);
+  // Which seat a balloon belongs to, and whether a human sent it or the table did:
+  // without this a sticker run cannot be read back out of a log at all.
+  vlog(`[VFG] stamp tid=${tid} idx=${idx} seat=${pindex} mid=${mid} name=${name || "CPU"} contents=${contents}`);
+  return idx;
+}
+
+// A finished table nobody is seated at is over: its stamp backlog and each seat's
+// place in that backlog go with it. Nothing else ever dropped them, so a long-lived
+// process kept the balloons of matches that ended hours ago.
+function closeStampRoom(tid: number): void {
+  STAMPS.delete(tid);
+  const prefix = `${Number(tid) || 0}|`;
+  for (const key of Array.from(STAMP_CURSOR.keys())) {
+    if (String(key).startsWith(prefix)) STAMP_CURSOR.delete(key);
+  }
 }
 
 function stampXml(tag: string, tid: number, since: number = 0): string {
@@ -407,18 +573,38 @@ function stampXml(tag: string, tid: number, since: number = 0): string {
 }
 
 const CPU_STAMP_REPLIES = ["TableSticker001", "TableSticker002", "TableSticker003", "TableSticker004"];
-function seatsForTid(tid: number): number {
+
+// The seats this table runs as CPUs: every seat that is not one of its human seats.
+// That is the same list the engine drives (taikyoku.ts humans), so a reply can only
+// land where a CPU actually sits.
+function cpuSeatsForTid(tid: number): number[] {
   const table = SHARED_TABLES.get(tid);
-  if (table) return table.seats;
-  for (const m of PLAYER_SEAT.values()) if (Number(m.tid || 0) === Number(tid)) return 4;
-  return 4;
+  if (!table) return [];
+  const seats = Number((table as any).seats) || 0;
+  const humans = new Set<number>(((table as any).humans || []).map((h: any) => Number(h)));
+  const out: number[] = [];
+  for (let i = 0; i < seats; i++) if (!humans.has(i)) out.push(i);
+  return out;
 }
+
+// A CPU at the table answers a sticker a human seat sent. It replies only from a seat
+// that is a CPU seat - the old version aimed at any seat but the sender's, human or
+// empty, which is why one player's sticker drew balloons on the other three players -
+// and it never answers with the sticker that seat is already showing, which is the
+// same-sticker-twice-on-one-seat look out of a four-item pool.
 function maybeCpuStamp(tid: number, humanPindex: number): void {
+  const cpuSeats = cpuSeatsForTid(tid);
+  if (!cpuSeats.length) return;
   if (Math.random() > 0.55) return;
-  const seats = seatsForTid(tid);
-  if (seats < 2) return;
-  const seat = (humanPindex + Math.floor(Math.random() * (seats - 1)) + 1) % seats;
-  const pick = CPU_STAMP_REPLIES[Math.floor(Math.random() * CPU_STAMP_REPLIES.length)];
+  const seat = cpuSeats[Math.floor(Math.random() * cpuSeats.length)];
+  const room = STAMPS.get(tid) || [];
+  let lastOnSeat = "";
+  for (let i = room.length - 1; i >= 0; i--) {
+    if (Number(room[i].pindex) === seat) { lastOnSeat = String(room[i].contents || ""); break; }
+  }
+  const pool = CPU_STAMP_REPLIES.filter((x) => x !== lastOnSeat);
+  if (!pool.length) return;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
   stampPost(tid, 0, seat, "CPU", pick, "");
 }
 
@@ -2214,7 +2400,15 @@ function sendDiscordWebhook(url: string, payload: any) {
     PLAYER_SEAT.set(pcuid, { tid, pindex: 0, name, mid, profile, lobbyKey: `solo_${tid}`, gmode, taku_class, refid, guest, scramble });
     vlog(`[VFG] solo 2P table tid=${tid} name=${name} mid=${mid} gmode=${gmode}${scramble ? " scramble=" + scramble : ""}`);
   } else {
+    const back = await returningSeat(refid, pcuid, lobbyKey, name, mid, profile, gmode, taku_class, guest, scramble);
+    if (back) {
+      sendXml(ctx, entryXml(ctx, back.tid, back.pindex, gmode));
+      return;
+    }
     let lobby = MATCH_LOBBY.get(lobbyKey);
+    if (lobby) {
+      await pruneLobbyMembers(lobbyKey, lobby, "entry");
+    }
     if (!lobby) {
       const cTime = nowUnix();
       lobby = { pcuids: [], tid: await allocateTid(), createdAt: cTime };
@@ -2286,12 +2480,17 @@ function sendDiscordWebhook(url: string, payload: any) {
     pindex = lobby.pcuids.indexOf(pcuid);
     tid = lobby.tid;
     PLAYER_SEAT.set(pcuid, { tid: lobby.tid, pindex, name, mid, profile, lobbyKey, gmode, taku_class, refid, guest, scramble });
+    // Which table this entry landed in and which seat it was given: without this a
+    // matching run cannot be read back at all, and "did these lanes share a table" is
+    // the first question any waiting-room report has to answer.
+    vlog(`[VFG] entry lobby=${lobbyKey} tid=${lobby.tid} seat=${pindex} of ${seats} gmode=${gmode} name=${name} members=${lobby.pcuids.length}`);
 
     if (lobby.pcuids.length >= seats) {
       const taku = GMODE_TAKU[gmode] ?? 0;
       const human_seats = lobby.pcuids.map((id, i) => i);
       ensureSharedTable(lobby.tid, taku, human_seats, { gmode, taku_class, scramble });
       MATCH_LOBBY.delete(lobbyKey);
+      vlog(`[VFG] lobby=${lobbyKey} tid=${lobby.tid} filled: seats ${human_seats.join(",")} human, ${seats - human_seats.length} CPU seat(s)`);
     }
   }
 
@@ -2337,12 +2536,21 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
   if (lobby && (lobby.tid !== seatInfo.tid || lobby.pcuids.indexOf(pcuid) < 0)) lobby = undefined;
 
   if (lobby) {
-    if (nowUnix() - lobby.createdAt > LOBBY_FORCE_SECONDS) {
-      const taku = GMODE_TAKU[gmode] ?? 0;
-      const human_seats = lobby.pcuids.map((id, i) => i);
-      ensureSharedTable(lobby.tid, taku, human_seats, { gmode, taku_class: seatInfo.taku_class, scramble: seatInfo.scramble });
+    await pruneLobbyMembers(lobbyKey, lobby, "gget");
+    if (!lobby.pcuids.length) {
+      // Nobody is waiting in this lobby any more and it is not a table: it is not
+      // something a poll can be answered from.
       MATCH_LOBBY.delete(lobbyKey);
+      lobby = undefined;
     }
+  }
+  if (lobby && nowUnix() - lobby.createdAt > LOBBY_FORCE_SECONDS) {
+    const taku = GMODE_TAKU[gmode] ?? 0;
+    const human_seats = lobby.pcuids.map((id, i) => i);
+    ensureSharedTable(lobby.tid, taku, human_seats, { gmode, taku_class: seatInfo.taku_class, scramble: seatInfo.scramble });
+    MATCH_LOBBY.delete(lobbyKey);
+    lobby = undefined;
+    vlog(`[VFG] lobby=${lobbyKey} tid=${seatInfo.tid} matching window closed: seats ${human_seats.join(",")} human, ${seats - human_seats.length} CPU seat(s)`);
   }
 
   let table = SHARED_TABLES.get(seatInfo.tid);
@@ -2357,12 +2565,8 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
     const now = Date.now();
     for (let i = (table as any).humans.length - 1; i >= 0; i--) {
       const h_seat = (table as any).humans[i];
-      let h_info = null;
-      for (const p of PLAYER_SEAT.values()) {
-        if (p.tid === seatInfo.tid && p.pindex === h_seat) {
-          h_info = p; break;
-        }
-      }
+      const heldSeat = seatAt(seatInfo.tid, h_seat);
+      const h_info = heldSeat ? heldSeat.seat : null;
       
       if (h_info) {
         if (!(h_info as any).lastSeen) {
@@ -2402,22 +2606,37 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
   const players = [];
   if (table) {
     isMatched = true;
-    // If table exists, gather players from PLAYER_SEAT
+    // The member list comes from the table: a seat is human exactly when the engine
+    // is running it as a human seat (taikyoku.ts humans), and the player in it is the
+    // session that actually holds it. Building the list out of PLAYER_SEAT instead
+    // announced a seat a CPU had taken over as a human, and handed out whichever
+    // session's seat was inserted first.
+    const humanSeats = new Set<number>(((table as any).humans || []).map((h: any) => Number(h)));
     for (let i = 0; i < seats; i++) {
-      let found = null;
-      for (const p of PLAYER_SEAT.values()) {
-        if (p.tid === seatInfo.tid && p.pindex === i) {
-          found = { pcuid: "unknown", mid: p.mid, name: p.name, profile: p.profile };
-          break;
-        }
+      if (!humanSeats.has(i)) { players.push(null); continue; }
+      const held = seatAt(seatInfo.tid, i);
+      if (!held || held.evicted) {
+        // Nobody is sitting at this seat any more. The engine would still wait on it
+        // for a discard no client is going to send, so it goes to the CPU the table
+        // will actually play - out of the table's own human list and out of the
+        // answer, in the same breath, so both sides describe the same seat.
+        if (held) PLAYER_SEAT.delete(held.pcuid);
+        (table as any).humans = ((table as any).humans || []).filter((h: any) => Number(h) !== i);
+        humanSeats.delete(i);
+        vlog(`[VFG] gget tid=${seatInfo.tid} seat ${i} has no live seat behind it, handed to CPU`);
+        players.push(null);
+        continue;
       }
-      players.push(found);
+      const prof = await seatProfile(held.seat);
+      players.push({ pcuid: held.pcuid, mid: Number(held.seat.mid || 0) || 0, name: held.seat.name, profile: prof });
     }
   } else if (lobby) {
     // If still in lobby, gather players from lobby
     for (const puid of lobby.pcuids) {
       const s = PLAYER_SEAT.get(puid);
-      players.push({ pcuid: puid, mid: s?.mid || 0, name: s?.name || "ゲスト", profile: s?.profile });
+      if (!s) continue;
+      const prof = await seatProfile(s);
+      players.push({ pcuid: puid, mid: s?.mid || 0, name: s?.name || "ゲスト", profile: prof });
     }
   } else {
     players.push({ pcuid, mid: seatInfo.mid, name: seatInfo.name, profile: seatInfo.profile });
@@ -2561,6 +2780,10 @@ export async function handle_end_or_kiken(form: Record<string, string>, ctx: any
 
   PLAYER_SEAT.delete(pcuid);
 
+  let seatsLeft = 0;
+  for (const s of PLAYER_SEAT.values()) if (Number(s.tid) === Number(seatInfo.tid)) seatsLeft++;
+  if (!seatsLeft) closeStampRoom(seatInfo.tid);
+
   const body = mgresultXml(table, seatInfo.pindex);
   sendXml(ctx, xml_response(body));
 }
@@ -2588,8 +2811,18 @@ export async function handle_end_show(form: Record<string, string>, ctx: any): P
 export async function handle_gchat(form: Record<string, string>, ctx: any): Promise<void> {
   const pcuid = formGet(form, "pcuid");
   const tid = Number(formGet(form, "tid") || 0) || 0;
-  const mid = Number(formGet(form, "mid") || 0) || 0;
-  const pindex = Number(formGet(form, "pindex") || 0) || 0;
+  // The seat a sticker belongs to is the seat this session was seated at, not the
+  // pindex the request claims. Every other match request resolves the seat this way
+  // (addressedSeat); gchat was the one handler that took the claim on faith, so a
+  // lane whose seat had moved posted its stickers onto somebody else's seat where
+  // every other player could see them.
+  const seatInfo = addressedSeat(pcuid, tid, Number(formGet(form, "pindex") || 0), "gchat");
+  if (!seatInfo) {
+    sendXml(ctx, xml_error(SERV_ST_NO_TABLE));
+    return;
+  }
+  const mid = Number(seatInfo.mid || 0) || 0;
+  const pindex = Number(seatInfo.pindex) || 0;
   let name = formGet(form, "name");
   let contents = formGet(form, "contents");
   const param = formGet(form, "param");
@@ -2620,8 +2853,14 @@ export async function handle_gchat(form: Record<string, string>, ctx: any): Prom
 export async function handle_gget_stamp_info(form: Record<string, string>, ctx: any): Promise<void> {
   const parts = parseMust(form);
   const tid = mustInt(parts, 2, 1);
-  const pindex = mustInt(parts, 3, 0);
-  const mid = mustInt(parts, 4, 0);
+  let pindex = mustInt(parts, 3, 0);
+  let mid = mustInt(parts, 4, 0);
+  // Same seat rule as /gchat: the sticker lands on the seat this session holds.
+  const pcuid = formGet(form, "pcuid");
+  if (pcuid) {
+    const seatInfo = addressedSeat(pcuid, tid, pindex, "gget_stamp_info");
+    if (seatInfo) { pindex = Number(seatInfo.pindex) || 0; mid = Number(seatInfo.mid || 0) || 0; }
+  }
   const info = (formGet(form, "stamp_info") || "").split(",");
   let since = 0;
   try { since = Number(info[1] || 0) || 0; } catch { since = 0; }
@@ -2638,6 +2877,10 @@ export async function handle_gget_stamp_info(form: Record<string, string>, ctx: 
     stampPost(tid, mid, pindex, info[3] || "", info[2], "");
     maybeCpuStamp(tid, pindex);
   }
+  // gget and gchat remember what they delivered to this seat; this path did not, so
+  // the same backlog could be shown to the same client twice.
+  const room = STAMPS.get(tid) || [];
+  if (pcuid && room.length) stampCursorMark(tid, pcuid, Number(room[room.length - 1].idx) || 0);
   sendXml(ctx, xml_response(stampXml("stamp_info", tid, since)));
 }
 
