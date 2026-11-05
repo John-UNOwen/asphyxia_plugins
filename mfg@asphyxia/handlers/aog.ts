@@ -2788,73 +2788,108 @@ export async function handle_gpost(form: Record<string, string>, ctx: any): Prom
   sendXml(ctx, xml);
 }
 
-export async function handle_end_or_kiken(form: Record<string, string>, ctx: any): Promise<void> {
+export async function handle_end_or_kiken(form: Record<string, string>, ctx: any, isKiken: boolean = false): Promise<void> {
   const pcuid = formGet(form, "pcuid");
   // EndGame.cs:22 and KikenGame.cs:22 post web_id/area_id/pcuid/tid/pindex/mid -
   // tid is the table being closed, and there is no gmode on this request: the mode
   // is whatever the table was entered with.
   const tid = Number(formGet(form, "tid") || 0) || 0;
   const claimedPindex = Number(formGet(form, "pindex") || 0) || 0;
-  const seatInfo = await matchSeat(pcuid, tid, claimedPindex, "end_game");
+  const tag = isKiken ? "kiken_game" : "end_game";
+  const seatInfo = await matchSeat(pcuid, tid, claimedPindex, tag);
   if (!seatInfo) {
     sendXml(ctx, xml_error(SERV_ST_NO_TABLE));
     return;
   }
   const table = SHARED_TABLES.get(seatInfo.tid);
   if (!table) {
-    vlog(`[VFG] end_game/kiken_game has no table behind tid=${seatInfo.tid} -> serv_st ${SERV_ST_NO_TABLE}`);
+    vlog(`[VFG] ${tag} has no table behind tid=${seatInfo.tid} -> serv_st ${SERV_ST_NO_TABLE}`);
     sendXml(ctx, xml_error(SERV_ST_NO_TABLE));
     return;
   }
   const gmode = resolveGmode((table as any).gmode ?? seatInfo.gmode, 1);
   const scrambleSchool = String((table as any).scramble || seatInfo.scramble || "");
+  // Whether the engine reached the end of the taikyoku at its last kyoku. This handler
+  // closing a table is not a finish: only a match that was played out is archived.
+  const naturalFinish = !!(table as any).completed;
 
-  if (!(table as any).archiveSaved) {
-    (table as any).archiveSaved = true;
-    // Only archive naturally finished matches: a kiken mid-game would
-    // record bogus ranks into player_record histories.
-    if ((table as any).finished) {
-      const rows = (table as any).result_rows() as Array<[number, number, number]>;
-      const seats = Number((table as any).seats || 0);
-      const yaku = ((table as any).yakuman || []) as number[];
-      const playersInfo = rows.map((r, i) => {
-        const s = Array.from(PLAYER_SEAT.values()).find(x => x.tid === seatInfo.tid && x.pindex === i);
-        const seatProfile: any = s ? (s as any).profile : null;
-        return {
-          pindex: i,
-          name: s ? s.name : "CPU",
-          mid: s ? Number(s.mid || 0) : 0,
-          refid: s ? (String((s as any).refid || "") || String(seatProfile?.refid || "")) : "",
-          // What kind of account this seat was, recorded so a guest match cannot
-          // be pulled up later as a card account's record.
-          guest: s ? !!(s as any).guest : false,
-          rank: r[0],
-          score: r[1],
-          uma: r[2],
-          yakuman: Number(yaku[i] || 0),
-          buttobi: r[1] < 0,
-          // Scramble festival result for this seat (player_record g2_scramble):
-          // the school the match was designated for and whether this seat won it.
-          ...(scrambleSchool ? { scramble: { belong: scrambleSchool, win: r[0] === 0 ? 1 : 0 } } : {}),
-        };
-      });
-      // @ts-ignore
-      DB.Insert({
-        collection: 'match_archive',
-        tid: seatInfo.tid,
-        gmode,
-        taku_class: Number((table as any).taku_class || 1) || 1,
-        seats,
-        timestamp: Date.now(),
-        players: playersInfo,
-        // Full cell stream for get_haifu_data replay: same
-        // cell_data_N format the live client already parses.
-        cells: Array.isArray((table as any).cells) ? [...(table as any).cells] : [],
-      }).catch((e: any) => console.error(e));
-    }
+  if (isKiken) {
+    const quitSeat = seatInfo.pindex;
+    // MahjongPlayFlow.cs:758-768 posts the KIKEN command (kind 13) and then this endpoint.
+    // Table.resign() settles the seat behind every seat that plays the match out - the auto
+    // loss 棄和 is supposed to be - and leaves the seat to the CPU for the rest of the match.
+    (table as any).resign(quitSeat);
+    vlog(`[VFG] ${tag} tid=${seatInfo.tid} seat ${quitSeat} (${seatInfo.name}) resigned: ` +
+      `settled last, seat handed to CPU`);
+    // The seat record goes with the player, so a re-login cannot take back a seat that was
+    // given up. The archive still has to know who sat there.
+    (table as any).seat_quit = (table as any).seat_quit || {};
+    (table as any).seat_quit[quitSeat] = {
+      name: seatInfo.name,
+      mid: Number(seatInfo.mid || 0) || 0,
+      refid: String((seatInfo as any).refid || ""),
+      guest: !!(seatInfo as any).guest,
+    };
   }
-  table.state = "game_end";
-  table.finished = true;
+
+  // Only a match the engine finished at its last kyoku is archived. A resign mid-match is not
+  // a finish, and it must not burn the latch either: the seats that stayed play on, and their
+  // natural end is what gets recorded.
+  if (!(table as any).archiveSaved && naturalFinish) {
+    (table as any).archiveSaved = true;
+    const rows = (table as any).result_rows() as Array<[number, number, number]>;
+    const seats = Number((table as any).seats || 0);
+    const yaku = ((table as any).yakuman || []) as number[];
+    const quit = (table as any).seat_quit || {};
+    const resignedSeats = ((table as any).resigned || []) as number[];
+    const playersInfo = rows.map((r, i) => {
+      const s = Array.from(PLAYER_SEAT.values()).find(x => x.tid === seatInfo.tid && x.pindex === i);
+      const seatProfile: any = s ? (s as any).profile : null;
+      const q = quit[i];
+      return {
+        pindex: i,
+        name: s ? s.name : (q ? q.name : "CPU"),
+        mid: s ? Number(s.mid || 0) : (q ? q.mid : 0),
+        refid: s ? (String((s as any).refid || "") || String(seatProfile?.refid || "")) : String((q && q.refid) || ""),
+        // What kind of account this seat was, recorded so a guest match cannot
+        // be pulled up later as a card account's record.
+        guest: s ? !!(s as any).guest : (q ? !!q.guest : false),
+        rank: r[0],
+        score: r[1],
+        uma: r[2],
+        yakuman: Number(yaku[i] || 0),
+        buttobi: r[1] < 0,
+        // 棄和: settled last whatever its points said at the time.
+        kiken: resignedSeats.includes(i) ? 1 : 0,
+        // Scramble festival result for this seat (player_record g2_scramble):
+        // the school the match was designated for and whether this seat won it.
+        ...(scrambleSchool ? { scramble: { belong: scrambleSchool, win: r[0] === 0 ? 1 : 0 } } : {}),
+      };
+    });
+    // @ts-ignore
+    DB.Insert({
+      collection: 'match_archive',
+      tid: seatInfo.tid,
+      gmode,
+      taku_class: Number((table as any).taku_class || 1) || 1,
+      seats,
+      timestamp: Date.now(),
+      players: playersInfo,
+      // Full cell stream for get_haifu_data replay: same
+      // cell_data_N format the live client already parses.
+      cells: Array.isArray((table as any).cells) ? [...(table as any).cells] : [],
+    }).catch((e: any) => console.error(e));
+  }
+
+  if (!isKiken) {
+    table.state = "game_end";
+    table.finished = true;
+  } else if (!(((table as any).humans || []).length)) {
+    // Nobody is left to play the match out: close the table.
+    table.state = "game_end";
+    table.finished = true;
+    vlog(`[VFG] ${tag} tid=${seatInfo.tid} closed with no human seat left after the resign`);
+  }
 
   PLAYER_SEAT.delete(pcuid);
 
@@ -3704,7 +3739,9 @@ export const AOG_HANDLER_MAP: Record<string, (f: any, c: any) => Promise<void>> 
   gget: handle_gget,
   gpost: handle_gpost,
   end_game: handle_end_or_kiken,
-  kiken_game: handle_end_or_kiken,
+  // The route is the only thing that says whether a seat gave the match up: EndGame.cs:21
+  // and KikenGame.cs:21 post the same fields.
+  kiken_game: (f: any, c: any) => handle_end_or_kiken(f, c, true),
   end_show: handle_end_show,
   reconnect: handle_reconnect,
   chk_tabooword: handle_chk_tabooword,

@@ -135,6 +135,11 @@ export class Table {
   pending_tsumo_choices: any | null;
   call_ctx: any | null;
   finished: boolean;
+  // Seats that resigned, per match (not reset per kyoku, like yakuman).
+  resigned: number[];
+  // Set only where the engine ends the taikyoku at its last kyoku: the difference between a
+  // match that was played out and one a request closed.
+  completed: boolean;
   advance_kyoku: boolean;
   nokori_start: number;
 
@@ -188,6 +193,8 @@ export class Table {
     this.pending_tsumo_choices = null;
     this.call_ctx = null;
     this.finished = false;
+    this.resigned = [];
+    this.completed = false;
     this.advance_kyoku = true;
     this.nokori_start = 0;
     // init kyoku state fields to satisfy TS definite assignment
@@ -237,6 +244,37 @@ export class Table {
 
   seat_wind(seat: number): number {
     return ((seat - this.oya) % this.seats + this.seats) % this.seats;
+  }
+
+  // 棄和: the seat gave the match up. It stays in the taikyoku, played by the CPU for the
+  // rest of it, and result_rows() settles it behind every seat that played out. False when
+  // the seat already resigned, so a client that posts both the KIKEN command (kind 13) and
+  // /kiken_game is not counted twice.
+  resign(seat: number): boolean {
+    seat = Number(seat) % this.seats;
+    if (this.resigned.includes(seat)) return false;
+    this.resigned.push(seat);
+    this.humans = this.humans.filter((h) => Number(h) !== seat);
+    this.next_kyoku_ready.delete(seat);
+    // The table goes on without the seat: the CPU makes the discard it was thinking about,
+    // and an offer it had on the table is dropped so the call resolves without it.
+    if (this.state === "discard" && Number(this.turn) === seat) {
+      if (this.pending_tsumo_choices && Number(this.pending_tsumo_choices.seat) === seat) {
+        // Nobody is going to answer that offer. Flushing it after the CPU already discarded
+        // would put a select cell behind the move it offered.
+        this.pending_tsumo_choices = null;
+      }
+      this._cpu_turn(seat);
+    } else if (this.state === "call" && this.sute_choices[seat]) {
+      const choice = this.sute_choices[seat];
+      delete this.sute_choices[seat];
+      let anyHumanCanCall = false;
+      for (const h of this.humans) {
+        if (this.sute_choices[h]) { anyHumanCanCall = true; break; }
+      }
+      if (!anyHumanCanCall) this._cpu_calls(choice.discarder, choice.tile);
+    }
+    return true;
   }
 
   private _new_kyoku_state(): void {
@@ -1265,6 +1303,7 @@ export class Table {
     if (game_over) {
       this.state = "game_end";
       this.finished = true;
+      this.completed = true;
     } else {
       this.state = "kyoku_end";
     }
@@ -1341,8 +1380,7 @@ export class Table {
         this.next_kyoku();
       }
     } else if (kind === S_KIKEN) {
-      this.state = "game_end";
-      this.finished = true;
+      this.resign(seat);
     }
   }
 
@@ -1459,6 +1497,13 @@ export class Table {
   // result for /end_game
   result_rows(): [number, number, number][] {
     const ranks = this._ranks();
+    // 棄和 is a loss, not a standing: a seat that gave the match up is settled behind
+    // every seat that played it out, whatever its points say at that moment.
+    const order = Array.from({ length: this.seats }, (_, i) => i).sort((a, b) => ranks[a] - ranks[b]);
+    const settled = order.filter((s) => !this.resigned.includes(s))
+      .concat(order.filter((s) => this.resigned.includes(s)));
+    const settle: number[] = new Array(4).fill(0);
+    settled.forEach((s, r) => { settle[s] = r; });
     const uma_table: Record<number, number[]> = {
       4: [20000, 10000, -10000, -20000],
       3: [20000, 0, -20000],
@@ -1467,7 +1512,7 @@ export class Table {
     const uma = uma_table[this.seats] ?? [0, 0, 0, 0];
     const rows: [number, number, number][] = [];
     for (let s = 0; s < this.seats; s++) {
-      const r = ranks[s];
+      const r = settle[s];
       rows.push([r, this.scores[s], r < uma.length ? uma[r] : 0]);
     }
     return rows;
