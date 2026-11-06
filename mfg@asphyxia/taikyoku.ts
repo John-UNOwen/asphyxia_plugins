@@ -277,6 +277,22 @@ export class Table {
     return true;
   }
 
+  // The other side of the disconnect conversion. handle_gget keeps a quiet seat's record
+  // exactly so that a reconnect can hand the seat back, and its own comment promises it
+  // (aog.ts:2647-2649); without this the seat is out of the engine's human list for the
+  // rest of the match and the player who comes back watches their own seat play itself.
+  // The calls the CPU was going to answer for that seat were answered when it was converted,
+  // so nothing here is left waiting on a seat that has no offer of its own. A seat that
+  // resigned is surrendered for the match and is never handed back.
+  reclaim(seat: number): boolean {
+    seat = Number(seat) % this.seats;
+    if (this.completed) return false;
+    if (this.resigned.includes(seat)) return false;
+    if (this.humans.some((h) => Number(h) === seat)) return false;
+    this.humans.push(seat);
+    return true;
+  }
+
   private _new_kyoku_state(): void {
     this.next_kyoku_ready.clear();
     this.hands = [[], [], [], []];

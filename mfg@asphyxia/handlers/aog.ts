@@ -2689,8 +2689,20 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
     // session's seat was inserted first.
     const humanSeats = new Set<number>(((table as any).humans || []).map((h: any) => Number(h)));
     for (let i = 0; i < seats; i++) {
-      if (!humanSeats.has(i)) { players.push(null); continue; }
       const held = seatAt(seatInfo.tid, i);
+      if (!humanSeats.has(i)) {
+        // The conversion above can leave a seat out of the engine's human list with its
+        // record kept - kept precisely so a reconnect can hand it back. When a live session
+        // is sitting in that seat again, hand it back in the engine too so the table and
+        // this answer describe the same seat. A seat that resigned is refused by reclaim().
+        if (held && !held.silent && !held.evicted && typeof (table as any).reclaim === "function" && (table as any).reclaim(i)) {
+          humanSeats.add(i);
+          vlog(`[VFG] gget tid=${seatInfo.tid} seat ${i} back with its player: taken off the CPU`);
+        } else {
+          players.push(null);
+          continue;
+        }
+      }
       if (!held || held.silent) {
         // Nothing has addressed this seat for a whole matching window. The engine would
         // wait on it for a discard nobody is going to send, so it goes to the CPU the
