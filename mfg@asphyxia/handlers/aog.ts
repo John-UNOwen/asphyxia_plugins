@@ -3206,14 +3206,21 @@ export async function handle_gchat(form: Record<string, string>, ctx: any): Prom
 export async function handle_gget_stamp_info(form: Record<string, string>, ctx: any): Promise<void> {
   const parts = parseMust(form);
   const tid = mustInt(parts, 2, 1);
-  let pindex = mustInt(parts, 3, 0);
-  let mid = mustInt(parts, 4, 0);
-  // Same seat rule as /gchat: the sticker lands on the seat this session holds.
+  // Same seat rule as /gchat, including the refusal: the sticker lands on the seat this
+  // session holds, and a session that holds no seat at this table is turned away. Resolving
+  // the seat and then only overwriting pindex/mid when it matched left the claim in place
+  // when it did not, so any pcuid - tids are small sequential integers, so every live table
+  // is addressable - wrote a sticker onto somebody else's seat under any PlayerName it
+  // claimed, and stampPost put that row in the room backlog read back by every client at
+  // that tid (gget / gpost / gchat deliver it, MatchingFlow.cs:549).
   const pcuid = formGet(form, "pcuid");
-  if (pcuid) {
-    const seatInfo = await matchSeat(pcuid, tid, pindex, "gget_stamp_info");
-    if (seatInfo) { pindex = Number(seatInfo.pindex) || 0; mid = Number(seatInfo.mid || 0) || 0; }
+  const seatInfo = await matchSeat(pcuid, tid, mustInt(parts, 3, 0), "gget_stamp_info");
+  if (!seatInfo) {
+    sendXml(ctx, xml_error(SERV_ST_NO_TABLE));
+    return;
   }
+  const pindex = Number(seatInfo.pindex) || 0;
+  const mid = Number(seatInfo.mid) || 0;
   const info = (formGet(form, "stamp_info") || "").split(",");
   let since = 0;
   try { since = Number(info[1] || 0) || 0; } catch { since = 0; }
