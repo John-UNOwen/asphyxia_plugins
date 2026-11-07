@@ -501,6 +501,25 @@ function seatAt(tid: number, index: number): { pcuid: string; seat: PlayerSeat; 
   return best;
 }
 
+// Hand a seat the CPU was running back to a player. One rule, in one place, so the poll
+// and the reconnect cannot end up with different ideas about which seats the engine runs
+// as human - they had: handle_reconnect pushed into table.humans with a duplicate check
+// and nothing else, so a seat that had resigned came back as a human seat, the inter-kyoku
+// gate waited on a next_kyoku_ready entry resign() had deleted, and every other client was
+// told the seat was a player again.
+// The engine owns that list, so admission is Table.reclaim()'s: it refuses a completed
+// table, a seat already in the list, and any seat that resigned - 棄和 surrenders the seat
+// for the rest of the match (taikyoku.ts:303-310). The other half is who is behind the
+// seat: only a live holder counts, so a record left by a silent or a retired session stays
+// the CPU's. `held` is the caller's own seatAt() for that seat, where it already has one.
+function reseatHumanSeat(table: any, tid: number, seat: number, tag: string, held?: ReturnType<typeof seatAt>): boolean {
+  const holder = held === undefined ? seatAt(tid, seat) : held;
+  if (!table || !holder || holder.silent || holder.evicted) return false;
+  if (typeof table.reclaim !== "function" || !table.reclaim(Number(seat))) return false;
+  vlog(`[VFG] ${tag} tid=${tid} seat ${seat} back with its player: taken off the CPU`);
+  return true;
+}
+
 // A lobby only means something while its members are still sitting in it. Membership
 // is append-only and a seat is released in exactly one place - end_game, which this
 // client never posts - so a refresh or an abandoned lane leaves the old session's
@@ -2895,9 +2914,15 @@ export async function handle_reconnect(form: Record<string, string>, ctx: any): 
   const seatInfo = PLAYER_SEAT.get(pcuid);
   if (seatInfo && SHARED_TABLES.has(seatInfo.tid)) {
     const table = SHARED_TABLES.get(seatInfo.tid);
-    if (table && !(table as any).humans.includes(seatInfo.pindex)) {
-      (table as any).humans.push(seatInfo.pindex);
-      (seatInfo as any).lastSeen = Date.now();
+    // A reconnect is this seat addressing the table again, so stamp it before the re-seat
+    // decision, exactly as matchSeat stamps a poll. Without that the seat the CPU took over
+    // for 60 s of silence is refused for being silent, which is the one thing its record
+    // was kept for.
+    (seatInfo as any).lastSeen = Date.now();
+    // Whether the engine will run this seat as a human again is its call, not this
+    // handler's: reseatHumanSeat() asks Table.reclaim(), the same gate handle_gget goes
+    // through, and reclaim() refuses a seat that resigned.
+    if (reseatHumanSeat(table, seatInfo.tid, seatInfo.pindex, "reconnect")) {
       vlog(`[VFG] Player ${seatInfo.name} in seat ${seatInfo.pindex} reconnected. Taking back control from CPU.`);
     }
     sendXml(ctx, entryXml(ctx, seatInfo.tid, seatInfo.pindex, resolveGmode(seatInfo.gmode, 1)));
@@ -3016,10 +3041,10 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
         // The conversion above can leave a seat out of the engine's human list with its
         // record kept - kept precisely so a reconnect can hand it back. When a live session
         // is sitting in that seat again, hand it back in the engine too so the table and
-        // this answer describe the same seat. A seat that resigned is refused by reclaim().
-        if (held && !held.silent && !held.evicted && typeof (table as any).reclaim === "function" && (table as any).reclaim(i)) {
+        // this answer describe the same seat. reseatHumanSeat() is that rule, and the
+        // reconnect route goes through the same one: reclaim() refuses a seat that resigned.
+        if (reseatHumanSeat(table, seatInfo.tid, i, "gget", held)) {
           humanSeats.add(i);
-          vlog(`[VFG] gget tid=${seatInfo.tid} seat ${i} back with its player: taken off the CPU`);
         } else {
           players.push(null);
           continue;
