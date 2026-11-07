@@ -1389,21 +1389,41 @@ function _tombstoneSession(sess: string, refid: string): void {
   }
 }
 
-// Retire a session on the account's own profile document and mirror it into
-// the read cache. Callers save the profile right after (handle_login already
-// does), so the record rides the existing profile-state helper
-// (saveProfile -> DB.Upsert { collection: "profile" }) instead of forking a
-// second document nothing reads. True when the record changed.
-export function tombstoneSessionOnProfile(p: ProfileDoc | null | undefined, sess: string): boolean {
+// Retire a session: record it on the account's own profile document and (unless
+// told not to) mirror it into the read cache. The record rides the profile write
+// the caller is doing anyway (saveProfile -> DB.Upsert { collection: "profile" })
+// instead of forking a second document nothing reads. True when the record changed.
+//
+// `mirror` is split out because the write can be refused, and a refusal is the
+// whole reason this record exists: handle_login / handle_logout have to write
+// FIRST and answer from what the write says, so the document record goes in
+// before the save and the in-memory half is published by
+// publishSessionTombstone only once storage has taken it. Retiring a session in
+// this process while storage still names it as the account's live pcuid is the
+// inconsistency that turns a refused write into a client locked out of its own
+// account: the retirement is invisible to the next process, the account's real
+// session is dead in this one.
+export function tombstoneSessionOnProfile(p: ProfileDoc | null | undefined, sess: string, mirror: boolean = true): boolean {
   const refid = String((p as any)?.refid || "");
   if (!p || !sess || !refid) return false;
   const list: any[] = Array.isArray((p as any).evicted_sessions) ? (p as any).evicted_sessions : [];
-  if (list.some((e: any) => String((e as any)?.session_id || "") === String(sess))) return false;
-  list.push({ session_id: String(sess), at: nowUnix() });
-  while (list.length > EVICTED_SESSIONS_PER_PROFILE) list.shift();
-  (p as any).evicted_sessions = list;
+  const known = list.some((e: any) => String((e as any)?.session_id || "") === String(sess));
+  if (!known) {
+    list.push({ session_id: String(sess), at: nowUnix() });
+    while (list.length > EVICTED_SESSIONS_PER_PROFILE) list.shift();
+    (p as any).evicted_sessions = list;
+  }
+  if (mirror) _tombstoneSession(String(sess), refid);
+  return !known;
+}
+
+// The in-memory half of a retirement, published when storage has taken the
+// document that records it. Same key the read path checks first (isEvictedSession),
+// so calling this is what makes the old pcuid answer the client's re-login path.
+export function publishSessionTombstone(p: ProfileDoc | null | undefined, sess: string): void {
+  const refid = String((p as any)?.refid || "");
+  if (!p || !sess || !refid) return;
   _tombstoneSession(String(sess), refid);
-  return true;
 }
 
 // The durable half of the answer: this profile document says the session was
@@ -1576,7 +1596,15 @@ export async function recordCardAuthIntent(refid: string, cardId: string): Promi
   const p = await getProfileByRefid(norm);
   if (!p) return false;
   (p as any).card_auth = { card_id: card, at: nowUnix(), used: 0 };
-  await saveProfile(norm, p);
+  // The stamp is the authorisation, so it is only real on storage: the window it
+  // opens is read back out of this document by the next /login (and survives a core
+  // restart precisely because it is stored). Callers that only log the presentation
+  // treat false as "not stamped"; presentViaPresenter answers it, because it is the
+  // one caller that tells somebody the presentation happened.
+  if (!(await saveProfile(norm, p))) {
+    vlog(`[VFG] card presentation NOT on storage refid=${norm} card=${card}: no login window opened (the card must be presented again)`);
+    return false;
+  }
   vlog(`[VFG] card credential presented refid=${norm} card=${card} -> login authorised for ${accountAuthPolicy().card_window}s`);
   return true;
 }
@@ -1634,11 +1662,20 @@ export async function presentViaPresenter(refid: string, cardId: string, secret:
     if (!issued) return { ok: false, bound: false, reason: "card is not an account id this deployment issued (no core card document); the presenter binds web-issued accounts only" };
     (p as any).card_id = card;
     (p as any).card_issued = "web";
-    await saveProfile(norm, p);
+    if (!(await saveProfile(norm, p))) {
+      // Answering ok here would tell the front the account is credential-bound while
+      // storage still has it card-less - and a card-less account is exactly what
+      // /login lets a bare DataID through. Nothing is bound until the write lands,
+      // so the presenter is told to do it again.
+      vlog(`[VFG] web presenter refused refid=${norm}: the card binding is NOT on storage - the account stays card-less and the presentation must be retried`);
+      return { ok: false, bound: false, reason: "the card binding did not reach storage; present again" };
+    }
     wasBound = false;
     vlog(`[VFG] web presenter bound card ${card} to refid=${norm}: account is credential-bound from now on, /login needs a presentation`);
   }
-  await recordCardAuthIntent(norm, card);
+  if (!(await recordCardAuthIntent(norm, card))) {
+    return { ok: false, bound: wasBound, reason: "the presentation did not reach storage; present again" };
+  }
   return { ok: true, bound: wasBound, reason: "presentation stamped for the login that follows" };
 }
 

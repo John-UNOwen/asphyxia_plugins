@@ -47,6 +47,7 @@ import {
   isQuarantinedProfile,
   isMintForbiddenRefid,
   tombstoneSessionOnProfile,
+  publishSessionTombstone,
   loginGate,
   accountGateEvent,
   nameWriteGate,
@@ -1277,7 +1278,7 @@ function recordMusicGain(profile: any, series: number, oid: string): void {
 const MUSIC_RESERVES_MAX = 8;
 const MUSIC_RESERVE_TTL_SECONDS = 30 * 60;
 
-function takeMusicReserve(profile: any, requestId: number): { series: number } | null {
+function takeMusicReserve(profile: any, requestId: number): { series: number; rec: any } | null {
   const raw = Array.isArray((profile as any).music_gacha_reserves) ? (profile as any).music_gacha_reserves : [];
   const live = raw.filter((r: any) => nowUnix() - Number((r as any)?.at || 0) <= MUSIC_RESERVE_TTL_SECONDS);
   (profile as any).music_gacha_reserves = live;
@@ -1285,7 +1286,9 @@ function takeMusicReserve(profile: any, requestId: number): { series: number } |
   if (idx < 0) return null;
   const rec = live[idx];
   live.splice(idx, 1);
-  return { series: Number((rec as any)?.series) || 0 };
+  // The record comes back with the series so a caller that has to undo the
+  // consumption (a write storage refused) can put the ticket back on the document.
+  return { series: Number((rec as any)?.series) || 0, rec };
 }
 
 // Append a log the client reported to the profile document. These endpoints
@@ -1367,6 +1370,22 @@ async function sessionAccount(ctx: any, pcuid: string, tag: string): Promise<any
   vlog(`[VFG] ${tag} no account behind pcuid=${String(pcuid || "-").slice(0, 12)}... -> serv_st ${SERV_ST_SESSION_LOST} (relogin)`);
   sendXml(ctx, xml_error(SERV_ST_SESSION_LOST));
   return null;
+}
+
+// Persist a profile and answer "did storage take it?", never throwing.
+// saveProfile already returns false for both shapes this deployment logs (a
+// cancelled upsert and a rejected one) and evicts the mutated document from the
+// profile cache on refusal; the try/catch here is for the one way a handler can
+// still come back with a clean answer over an unwritten document: AogMiddleware
+// turns a handler throw into a code-0 response, so a save that throws has to be
+// a refusal this handler sees, not an exception that escapes into that default.
+// Every call site that answers the shipping client asks this function instead of
+// awaiting saveProfile directly, so "the write did not land" can always reach the
+// wire. Callers whose write is housekeeping the answer does not depend on (a
+// derived dojo timer refresh, an ack, a log append) keep ignoring the result;
+// saveProfile's own refusal line is their record.
+async function saveProfileLanded(refid: string, doc: any): Promise<boolean> {
+  try { return await saveProfile(refid, doc); } catch { return false; }
 }
 
 export async function handle_appli_boot(form: Record<string, string>, ctx: any): Promise<void> {
@@ -1473,18 +1492,47 @@ export async function handle_login(form: Record<string, string>, ctx: any): Prom
   // the in-memory activity map is gone, the document is not.
   (profile as any).session_at = nowUnix();
   (profile as any).is_guest = guest;
-  if (prevSession && prevSession !== session) {
-    // Write the eviction itself onto the profile document (utils.ts
-    // tombstoneSessionOnProfile). The in-memory EVICTED_SESSIONS map is only
-    // the read cache: a superseded pcuid has to stay dead after this process
-    // is gone, and if the retirement is only memory the retired session is
-    // again just a lookup key the moment the core restarts. saveProfile below
-    // persists it, so the tombstone lands in the same document write.
-    tombstoneSessionOnProfile(profile, prevSession);
+  const rotating = !!prevSession && prevSession !== session;
+  // The eviction of the previous pcuid is written onto this same document (utils.ts
+  // tombstoneSessionOnProfile), so it lands or does not land with the rotation -
+  // which is why it is recorded here and NOT mirrored into the in-memory
+  // EVICTED_SESSIONS map yet: this process may only start refusing prevSession once
+  // storage has agreed the session it replaces is retired.
+  const tombAdded = rotating && tombstoneSessionOnProfile(profile, prevSession, false);
+  // Write first, then answer. This is the write the whole login rests on: the
+  // session_id answered below is the pcuid every later request carries, and
+  // nothing else in the plugin can tell the client that it did not land. When the
+  // core cancels the upsert (the {updated:0, upsert:false} shape logged 80 times in
+  // this deployment as "refid does not exists, upsert operation canceled") or the
+  // DB rejects it, answering code 0 here hands out a session that is not on
+  // storage - and since 1a17bf3 evicts the mutated document from the profile cache
+  // on refusal, that session cannot even resolve in this process, so the client
+  // that obeyed the code 0 gets 770 on its next request, 770 on its old session
+  // (tombstoned above), and re-logins into another code 0: the login loop, forever.
+  // A refusing DB used to be covered only for a refid that had to be minted
+  // (utils.ts ensureProfile); for every existing account the cached document made
+  // ensureProfile answer without touching storage, so login still said code 0.
+  const landed = await saveProfileLanded(profile.refid, profile);
+  if (!landed) {
+    // This login did not happen, so nothing is retired and no session is issued.
+    // prevSession is what the account still says on storage, so it stays live here
+    // too: retract the record this call added and put the document back the way
+    // storage has it (it is out of the profile cache after the refusal, and a
+    // handler still holding this reference must not smuggle the rotation - and the
+    // tombstone of a live session - into storage on some later incidental save).
+    (profile as any).session_id = prevSession;
+    if (tombAdded) {
+      const list: any[] = Array.isArray((profile as any).evicted_sessions) ? (profile as any).evicted_sessions : [];
+      const last = list[list.length - 1];
+      if (last && String((last as any).session_id || "") === prevSession) list.pop();
+    }
+    vlog(`[VFG] login refused refid=${userId}: the session rotation is NOT on storage -> serv_st ${SERV_ST_ACCOUNT_NOT_FOUND} (no session issued, previous session ${prevSession ? "kept live" : "none"})`);
+    sendXml(ctx, xml_error(SERV_ST_ACCOUNT_NOT_FOUND));
+    return;
   }
-  // saveProfile also updates the in-memory cache (and evicts the old pcuid)
-  await saveProfile(profile.refid, profile);
-  if (prevSession && prevSession !== session) {
+  if (rotating) {
+    // Storage took the retirement, so this process starts honouring it.
+    publishSessionTombstone(profile, prevSession);
     // The client still holding prevSession is now a stale session: the handlers
     // answer it with SERV_ST_SESSION_LOST instead of code 0 + GUEST/mid 1 so it
     // can re-login (utils.ts EVICTED_SESSIONS over profile.evicted_sessions).
@@ -1503,6 +1551,7 @@ export async function handle_login(form: Record<string, string>, ctx: any): Prom
   try {
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
     let dirty = false;
+    let applied: { granted: any[]; changed: boolean } = { granted: [], changed: false };
     if ((profile as any).last_daily !== today) {
       const pid = 91000000 + Number(today.slice(2).replace(/-/g, ""));
       const list = presentInfosOf(profile);
@@ -1517,12 +1566,21 @@ export async function handle_login(form: Record<string, string>, ctx: any): Prom
     // The auto-apply income is granted here, on the server, and receipted in the
     // same write. The client can never persist its box (PresentBoxGameData.Save
     // is never called), so this is where the receipt has to live.
-    const applied = autoApplyPresentInfos(profile);
-    if (applied.changed) {
-      dirty = true;
-      logGranted(profile, applied.granted);
+    applied = autoApplyPresentInfos(profile);
+    if (applied.changed) dirty = true;
+    if (dirty) {
+      // A grant that is not on storage is not income, so the receipt is only
+      // announced when the write landed. This cannot undo the login above (the
+      // rotation, which is what the answer is about, is already durable), but it
+      // does stop the income log from claiming a box the account does not have:
+      // saveProfile evicted the mutated document on refusal, so the next read sees
+      // storage truth - last_daily unmarked, the present offered again.
+      if (await saveProfileLanded(profile.refid, profile)) {
+        if (applied.changed) logGranted(profile, applied.granted);
+      } else {
+        vlog(`[VFG] login refid=${userId}: daily-bonus/auto-apply write NOT on storage - income NOT claimed, last_daily not persisted (the grant is offered again)`);
+      }
     }
-    if (dirty) await saveProfile(profile.refid, profile);
   } catch { }
   vlog(`[VFG] login refid=${userId} guest=${guest} mid=${(profile as any).player_id} session=${session.slice(0, 8)}... auth=${gate.reason} keys=${Object.keys(form).join(",")}`);
   const xml = xml_response(`<auth><session_id>${session}</session_id></auth>`);
@@ -1540,9 +1598,37 @@ export async function handle_logout(form: Record<string, string>, ctx: any): Pro
   let p: any = null;
   try { p = await sessionProfile(pcuid); } catch { p = null; }
   if (p) {
-    tombstoneSessionOnProfile(p, pcuid);
+    // Same rule as the login rotation: a retirement that is not on storage has not
+    // happened. tombstoneSessionOnProfile is the record that makes "this pcuid is
+    // retired" outlive the process (utils.ts EVICTED_SESSIONS is only the read
+    // cache), and the code comments have always claimed it is durable. It is not,
+    // if the write it rides is cancelled: the retired pcuid resolves again against
+    // the same savedata in a cold process - a session the player retired coming
+    // back over the same account. So the document record goes in first, the answer
+    // comes from the write, and the in-memory half is published only when storage
+    // took it.
+    const retiring = tombstoneSessionOnProfile(p, pcuid, false);
     (p as any).session_id = "";
-    await saveProfile((p as any).refid, p);
+    if (!(await saveProfileLanded((p as any).refid, p))) {
+      // Storage kept its version: session_id still names this pcuid, so this
+      // process must not pretend otherwise. Put the document back as storage has it
+      // (it is out of the profile cache after the refusal, and whoever still holds
+      // this reference must not later persist a session wipe storage refused - that
+      // would orphan a live player out of a failed logout) and say so on the wire.
+      // Logout.cs:16 is posted with enableErrorScreenTransition:false
+      // (GameoverFlow.cs:88), so a non-zero code is a swallowed failure, not an
+      // error screen - and it is the only channel that can say "not retired".
+      (p as any).session_id = pcuid;
+      if (retiring) {
+        const list: any[] = Array.isArray((p as any).evicted_sessions) ? (p as any).evicted_sessions : [];
+        const last = list[list.length - 1];
+        if (last && String((last as any).session_id || "") === String(pcuid)) list.pop();
+      }
+      vlog(`[VFG] logout refused session ${String(pcuid).slice(0, 8)}... of refid=${(p as any).refid}: the retirement is NOT on storage -> serv_st ${SERV_ST_STATE_INVALID} (that pcuid still resolves; the client must retry the logout)`);
+      sendXml(ctx, xml_error(SERV_ST_STATE_INVALID));
+      return;
+    }
+    publishSessionTombstone(p, pcuid);
     vlog(`[VFG] logout retired session ${String(pcuid).slice(0, 8)}... of refid=${(p as any).refid} (no live session on the account now)`);
   }
   const xml = xml_response();
@@ -1672,7 +1758,20 @@ export async function handle_create_player(form: Record<string, string>, ctx: an
       }
     } catch { }
   }
-  await saveProfile(p.refid, p);
+  if (!(await saveProfileLanded(p.refid, p))) {
+    // create_player exists to put this name on the account, and this is the write
+    // that does it. Answering code 0 over a cancelled upsert told the client the
+    // registration worked while the savedata still had the account under its old
+    // name (measured: code=0 with stored_name=GUEST for a posted name=ChosenName) -
+    // the client moves on to the game with a name the server never took, and on the
+    // card lane it re-registers into the same refusal. CreatePlayer is posted with
+    // enableErrorScreenTransition:false (GameDataManager.cs:135,
+    // CardEntryManager.cs:245/398), so a non-zero code is the client's own
+    // ENTRY_NETWORK_ERROR / NetworkError path, not an ERROR_STOP screen.
+    vlog(`[VFG] create_player refused refid=${userId} name='${name.slice(0, 40)}': the profile write is NOT on storage -> serv_st ${SERV_ST_STATE_INVALID} (name not stored)`);
+    sendXml(ctx, xml_error(SERV_ST_STATE_INVALID));
+    return;
+  }
   vlog(`[VFG] create_player refid=${userId} ${nameGate.write ? `name=${name}` : `name kept=${(p as any).name}`} mid=${(p as any).player_id} auth=${nameGate.reason}`);
 
   const card = CARD_STORE_BY_REFID.get(userId);
@@ -1683,7 +1782,13 @@ export async function handle_create_player(form: Record<string, string>, ctx: an
       const prof: any = await getProfileByRefid(userId);
       if (prof) {
         prof.card_bound = true;
-        await saveProfile(userId, prof);
+        if (!(await saveProfileLanded(userId, prof))) {
+          // The card is bound in this process either way; what did not land is the
+          // flag on the account. Nothing the client is told depends on it (this
+          // answer carries no payload and the binding itself lives in CARD_STORE),
+          // so the refusal is recorded and the create_player answer stays code 0.
+          vlog(`[VFG] create_player refid=${userId}: card_bound flag NOT on storage (card stays bound in this process only)`);
+        }
       }
     } catch (e) { try { console.error("saveProfile create_player error:", e); } catch {} }
   }
@@ -1709,8 +1814,18 @@ export async function handle_get_menudata(form: Record<string, string>, ctx: any
   try {
     const applied = autoApplyPresentInfos(p);
     const seeded = seedMusicGachaState(p);
-    if (applied.changed) logGranted(p, applied.granted);
-    if (applied.changed || seeded) await saveProfile((p as any).refid, p);
+    if (applied.changed || seeded) {
+      // The menu answer itself (mid + name) is storage's own data, so this write is
+      // not what the response claims; what it claims is the income. Announce the
+      // grant only over a document storage took, and name the failure when it did
+      // not land - saveProfile evicted the mutated document on refusal, so the next
+      // read sees the ungranted box and offers it again.
+      if (await saveProfileLanded((p as any).refid, p)) {
+        if (applied.changed) logGranted(p, applied.granted);
+      } else {
+        vlog(`[VFG] get_menudata refid=${(p as any).refid}: auto-apply${seeded ? "/music_gacha seed" : ""} write NOT on storage - income NOT claimed (offered again on the next read)`);
+      }
+    }
   } catch { }
   const xml = xml_response(
     "<menudata>" +
@@ -2406,11 +2521,17 @@ export async function handle_client_state_write(form: Record<string, string>, ct
   if (kind === "cc_request") {
     const res = sanitizeCcRequest(decoded);
     if (!res.ok) {
+      // The write the client is being refused is refused on the wire either way
+      // (SERV_ST_STATE_INVALID, the client's own save-failure channel), so nothing
+      // this branch answers depends on the quarantine record landing. What it must
+      // not do is report the quarantine as stored when the write did not land: the
+      // raw payload is the audit trail for the bad MemorialCard document.
+      let quarantined = true;
       if (!(profile as any).quarantine_cc_request) {
         (profile as any).quarantine_cc_request = { at: nowUnix(), dropped: res.dropped, raw: String(decoded).slice(0, 20000) };
-        await saveProfile((profile as any).refid, profile);
+        quarantined = await saveProfileLanded((profile as any).refid, profile);
       }
-      vlog(`[VFG] quarantined invalid cc_request write mid=${mid} refid=${(profile as any).refid} (kept last-good)`);
+      vlog(`[VFG] quarantined invalid cc_request write mid=${mid} refid=${(profile as any).refid} (kept last-good${quarantined ? "" : "; the quarantine record itself is NOT on storage"})`);
       sendXml(ctx, xml_error(SERV_ST_STATE_INVALID));
       return;
     }
@@ -3264,7 +3385,16 @@ export async function handle_dojo_get_status(form: Record<string, string>, ctx: 
   if (!p) { dojoNoAccount(ctx, form, "dojo_get_status"); return; }
   const slots = dojoState(p);
   for (const s of slots) dojoRefresh(s);
-  await saveProfile((p as any).refid, p);
+  // The only thing this write carries is derived state: dojoRefresh advances
+  // slot.stock/slot.next from the clock alone, so a refresh that never reached
+  // storage re-derives identically on the next poll and the answer below describes
+  // what storage holds. Refusing a read-only poll because a housekeeping write was
+  // cancelled would kick the player out of the dojo scene (DojoFlow.cs:425-428
+  // catches the refusal and leaves) for a loss that repairs itself, so this one
+  // answers and records.
+  if (!(await saveProfileLanded((p as any).refid, p))) {
+    vlog(`[VFG] dojo_get_status refid=${(p as any).refid}: derived slot refresh NOT on storage - the poll answers anyway and re-derives from start/next`);
+  }
   const body = slots.map((s, i) => dojoSlotXml(i, s)).join("");
   sendXml(ctx, xml_response(`<dojo><slot_nr>${DOJO_SLOTS}</slot_nr>${body}</dojo>`));
 }
@@ -3278,7 +3408,17 @@ export async function handle_dojo_set_slot(form: Record<string, string>, ctx: an
   const slotId = Math.max(0, Math.min(slotIdRaw, DOJO_SLOTS - 1));
   const slot = slots[slotId];
   Object.assign(slot, { available: true, chara, start: nowUnix(), next: nowUnix() + DOJO_LESSON_SECONDS, stock: 0 });
-  await saveProfile((p as any).refid, p);
+  if (!(await saveProfileLanded((p as any).refid, p))) {
+    // "updated 1" over a document storage never took would start a lesson the
+    // account does not have: the next poll re-derives the slot as it was and the
+    // lesson the player is waiting on never runs. This is a player action with no
+    // self-heal behind it, unlike the refresh above, so the write decides the
+    // answer. Safe on the client: DojoFlow.cs:103 posts it with
+    // enableErrorScreenTransition:false and catches the refusal out of the scene.
+    vlog(`[VFG] dojo_set_slot refused refid=${(p as any).refid} slot=${slotId}: the lesson start is NOT on storage -> serv_st ${SERV_ST_STATE_INVALID} (slot unchanged on storage)`);
+    sendXml(ctx, xml_error(SERV_ST_STATE_INVALID));
+    return;
+  }
   const body = dojoSlotXml(slotId, slot);
   sendXml(ctx, xml_response(`<dojo><slot_id>${slotId}</slot_id><updated>1</updated>${body}</dojo>`));
 }
@@ -3295,7 +3435,17 @@ export async function handle_dojo_gain_soul(form: Record<string, string>, ctx: a
   slot.stock = 0;
   slot.start = nowUnix();
   slot.next = nowUnix() + DOJO_LESSON_SECONDS;
-  await saveProfile((p as any).refid, p);
+  if (!(await saveProfileLanded((p as any).refid, p))) {
+    // The worst case of answering code 0 here is not a lost write, it is printed
+    // money: the client adds the <get_nr> souls to the account's balance while the
+    // server's slot still holds that stock, so the same souls are collected again
+    // on the next poll - and again, for as long as the write is refused. Refuse, so
+    // the souls the player has are only ever the ones storage paid out.
+    // DojoFlow.cs:128 posts it with enableErrorScreenTransition:false.
+    vlog(`[VFG] dojo_gain_soul refused refid=${(p as any).refid} slot=${slotId}: the stock reset is NOT on storage -> serv_st ${SERV_ST_STATE_INVALID} (${got} reserve soul(s) stay on the slot, nothing paid out)`);
+    sendXml(ctx, xml_error(SERV_ST_STATE_INVALID));
+    return;
+  }
   const body = dojoSlotXml(slotId, slot);
   sendXml(ctx, xml_response(`<dojo><slot_id>${slotId}</slot_id><get_nr>${got}</get_nr>${body}</dojo>`));
 }
@@ -3314,7 +3464,17 @@ export async function handle_req_draw_gacha(form: Record<string, string>, ctx: a
   const p = await getProfileBySession(formGet(form, "pcuid"));
   if (p) {
     (p as any).gacha_txn = { id: txn, gacha: formGet(form, "gacha_name"), times: Number(formGet(form, "times") || 1) || 1 };
-    await saveProfile(p.refid, p);
+    if (!(await saveProfileLanded(p.refid, p))) {
+      // The transaction id this answers with is the account's draw record, written
+      // onto the profile in the same breath; over a cancelled upsert the caller is
+      // handed an id that names nothing anywhere. ReqDrawGacha is posted with the
+      // error screen left at its default (RequestApiBase.cs:35) and has no call site
+      // in the shipping assembly, so the code is reported rather than swallowed -
+      // and a refused transaction is the honest thing to hand back either way.
+      vlog(`[VFG] req_draw_gacha refused refid=${(p as any).refid}: the draw transaction is NOT on storage -> serv_st ${SERV_ST_STATE_INVALID} (no transaction advertised)`);
+      sendXml(ctx, xml_error(SERV_ST_STATE_INVALID));
+      return;
+    }
   }
   sendXml(ctx, xml_response(`<transaction_info><transaction_id>${txn}</transaction_id></transaction_info>`));
 }
@@ -3484,7 +3644,22 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
     // Only what the client actually keeps: a ConfigGift draw is paid in gift
     // points and the account still does not own that cutin.
     rememberGachaGrants(profile, granted);
-    try { await saveProfile((profile as any).refid, profile); } catch { }
+    if (!(await saveProfileLanded((profile as any).refid, profile))) {
+      // The payout in this answer only exists if the account's own copy exists:
+      // the granted cutins, the gift-point credit and the unlock this draw mints
+      // are all in the document that was just refused, so answering is_success 1
+      // shows the player items the server does not have and the next draw rolls
+      // them as new again. This endpoint cannot use the status code for that -
+      // GachaSelectFlow.cs:752 posts it with no flags, so RequestApiBase.cs:35
+      // leaves enableErrorScreenTransition at true and a non-zero serv_st is the
+      // ERROR_STOP page, not a failed draw. <is_success>0</is_success> is the
+      // protocol's own "this draw did not happen" (GachaResultInfo.Parse stops
+      // there) and is the shape already used above when nothing can be rolled.
+      // Nothing is registered as a pending draw, because nothing was drawn.
+      vlog(`[VFG] gacha_draw id=${gachaId} refused: the payout write is NOT on storage (rolled=${rolled.join(",")}) -> is_success 0, nothing credited`);
+      sendXml(ctx, xml_response(`<gacha_draw><is_success>0</is_success><request_id>0</request_id><gain_items></gain_items><gift>0</gift></gacha_draw>`));
+      return;
+    }
   }
   vlog(`[VFG] gacha_draw id=${gachaId} type=${stype} rolled=${rolled.join(",")} spirits=${spirits.join(",")} gift_type=[${giftTypes.join(",")}] gift=${gift} config_gift=${configGifts} dropped=${unpayable} unlocked=[${unlockedChars.join(",")}] present01=${giftCount}`);
   // The id cutin_gacha_play_apply names a pending draw with. The lookup has no
@@ -3595,7 +3770,17 @@ export async function handle_music_gacha_play_reserve(form: Record<string, strin
   const list = Array.isArray((profile as any).music_gacha_reserves) ? (profile as any).music_gacha_reserves : [];
   list.push({ id, series, at: nowUnix() });
   (profile as any).music_gacha_reserves = list.slice(-MUSIC_RESERVES_MAX);
-  try { await saveProfile((profile as any).refid, profile); } catch { }
+  if (!(await saveProfileLanded((profile as any).refid, profile))) {
+    // The ticket this answers with is the reservation /music_gacha_play validates
+    // against, and it validates it out of this very document (takeMusicReserve
+    // reads profile.music_gacha_reserves). Over a cancelled write the client holds a
+    // request_id that names no reservation, so the play it posts next is refused
+    // with 930 and the player is told the pull could not run - after being told the
+    // reservation succeeded. Refuse here instead: a reserve costs the player
+    // nothing, so is_success 0 is a clean retry, and no ticket is issued that
+    // storage denies.
+    return fail("the reservation is not on storage - no ticket issued");
+  }
   vlog(`[VFG] music_gacha_reserve mid=${(profile as any).player_id} series=${series} request_id=${id} owned=${owned.size}/${pool.length}`);
   sendXml(ctx, xml_response(`<gacha_reserve><is_success>1</is_success><request_id>${id}</request_id></gacha_reserve>`));
 }
@@ -3628,7 +3813,20 @@ export async function handle_music_gacha_play(form: Record<string, string>, ctx:
   }
   const series = res.series;
   const pool = MUSIC_GACHA_POOL.get(series) as string[];
-  try { await saveProfile((profile as any).refid, profile); } catch { }
+  // The consumption is paid for before the item is, and "paid for" means storage took
+  // the ticket. Over a cancelled write the ticket is still on the account, so the play
+  // has not happened: refuse with this endpoint's own "transaction not open" code (the
+  // client catches it into its "could not run" screen - MusicGachaPlay.cs cannot render
+  // is_success 0), put the ticket back on the document this call mutated so whoever
+  // still holds this reference cannot persist a consumption the client was just told
+  // did not happen, and roll nothing. The player retries the same request_id.
+  if (!(await saveProfileLanded((profile as any).refid, profile))) {
+    const back: any[] = Array.isArray((profile as any).music_gacha_reserves) ? (profile as any).music_gacha_reserves : ((profile as any).music_gacha_reserves = []);
+    if (res.rec) back.push(res.rec);
+    vlog(`[VFG] music_gacha_play refused mid=${(profile as any).player_id} request_id=${req}: the ticket consumption is NOT on storage -> serv_st ${SERV_ST_ALREADY_FINISHED} (nothing rolled, the reservation is still on the account)`);
+    sendXml(ctx, xml_error(SERV_ST_ALREADY_FINISHED));
+    return;
+  }
 
   seedMusicGachaState(profile);
 
@@ -3658,7 +3856,20 @@ export async function handle_music_gacha_play(form: Record<string, string>, ctx:
   // the number the client's result flow trusts.
   let present01 = playerItemCount(profile, PI_PRESENT01);
   present01 = playerItemAdd(profile, PI_PRESENT01, 2).after;
-  try { await saveProfile((profile as any).refid, profile); } catch { }
+  // Same rule on the payout write: this server authors the account's music
+  // inventory (the shipping client has no write path for music_gacha - see
+  // musicGachaSeedState), so an <is_success>1</is_success> with a gain item names a
+  // track the account only owns if this document is on storage. Answering code 0 over
+  // a refused write shows a track in the result screen that is gone from the archive
+  // on the next read. 930 is this endpoint's existing honest failure (the client
+  // catches it; it cannot render is_success 0). The ticket for this pull is spent -
+  // the write that consumed it landed - so this is a loss the operator sees in the
+  // log line, not one the player can retry away.
+  if (!(await saveProfileLanded((profile as any).refid, profile))) {
+    vlog(`[VFG] music_gacha_play refused mid=${(profile as any).player_id} series=${series} request_id=${req}: the payout write is NOT on storage -> serv_st ${SERV_ST_ALREADY_FINISHED} (oid=${oid} NOT credited, ticket already consumed - check storage)`);
+    sendXml(ctx, xml_error(SERV_ST_ALREADY_FINISHED));
+    return;
+  }
 
   const infos = musicInfosOf(profile).find((x: any) => Number((x as any)?.GachaID) === Number(series));
   vlog(`[VFG] music_gacha_play mid=${(profile as any).player_id} series=${series} request_id=${req} oid=${oid} dup=${duplicate ? 1 : 0} poss=${infos ? infos.PossessionCount : "?"}/${pool.length} present01=${present01}`);
