@@ -1307,7 +1307,11 @@ export class Table {
   private _end_kyoku(winners: number[], renchan: boolean | null = null, draw: boolean = false): void {
     this._score_rank_cell();
     if (renchan === null) renchan = winners.includes(this.oya);
-    if (renchan || draw) this.honba += 1;
+    // Honba is a renchan counter, not a draw counter: only a dealer-continuing kyoku (dealer
+    // agari, dealer-tenpai exhaustive draw, or an abortive draw that forces renchan) carries a
+    // stick. On any non-renchan end - a non-dealer win, or an exhaustive draw with the dealer
+    // noten, where the dealer rotates - honba resets to 0 (docs/17-ryunet-comparison.md:280-283).
+    if (renchan) this.honba += 1;
     else this.honba = 0;
     this.advance_kyoku = !renchan;
     const last = this.kyoku_index >= this.total_kyoku - 1;
