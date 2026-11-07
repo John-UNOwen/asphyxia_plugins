@@ -457,10 +457,21 @@ const SEAT_SILENCE_MS = LOBBY_FORCE_SECONDS * 1000;
 // How long a seat record survives once nothing addresses it any more. The silence
 // window above only hands the seat to a CPU and deliberately keeps the record, so
 // a reconnect can give it back; this longer window is the point where that
-// reconnect is over. Without it a lane that never posts end_game (this client only
-// posts it from the result screen - a closed tab never does) kept its seat, its
-// profile reference, the table behind the seat and that table's stamp backlog for
-// the life of the process.
+// reconnect is over. The pause this 5x bound trades against is a live client that
+// stops polling without leaving: a WebGL page in a background tab, whose main loop -
+// and with it every m_commandClient.Fetch, the matching loop (MatchingFlow.cs:245)
+// and the play loop (MahjongPlayFlow.cs:677), both awaited on PlayerLoopTiming.Update
+// i.e. requestAnimationFrame - the browser throttles to a standstill, so the seat
+// goes silent while the tab is still there to come back for. It is NOT a player
+// parked on the result screen: MahjongPlayFlow posts EndGame inside TaikyokuStart()
+// (:772) and only then GotoNextScene("Result") (:734-737), so a seat that never posts
+// end_game is a tab that closed or froze, never one reading a result. Up to 5 matching
+// windows of backgrounding, the lane reclaims the same kyoku on the same tid; past the
+// bound the sweep reclaims the table, and now archives the kyoku it had dealt first
+// (archiveAbandonedTable), so the lane loses the live seat but keeps its settlement
+// and kifu. The cost the other way is memory only: a lane that is really gone keeps its
+// seat, its table, its stamp backlog and its profile reference for 5 matching windows
+// after its last poll instead of 1, which is what bounds the maps the sweep walks.
 const SEAT_ABANDON_MS = SEAT_SILENCE_MS * 5;
 
 // A sweep is as cheap as walking the seated sessions, so it does not need to run
@@ -709,17 +720,33 @@ function sweepMatchState(now: number): void {
   let released = 0;
   // A seat nobody has addressed since past the abandon window is a lane that is
   // not coming back: drop it (and with it the ProfileDoc reference it holds).
+  // Snapshot it against its table first: the abandoned-match archive below runs
+  // after this loop, and once PLAYER_SEAT has dropped the record seatAt can no
+  // longer say who sat there, so the archive would attribute their kyoku to CPUs.
+  const abandoning = new Map<number, Map<number, PlayerSeat>>();
   for (const [pcuid, seat] of Array.from(PLAYER_SEAT.entries())) {
     if (now - seatSeen(seat) <= SEAT_ABANDON_MS) continue;
+    const tid = Number(seat.tid) || 0;
+    const pindex = Number(seat.pindex) || 0;
+    let at = abandoning.get(tid);
+    if (!at) { at = new Map(); abandoning.set(tid, at); }
+    const prev = at.get(pindex);
+    // Two records for one seat (a re-login that never handed over): keep the one
+    // polled most recently, the same rank seatAt would give it.
+    if (!prev || seatSeen(seat) >= seatSeen(prev)) at.set(pindex, seat);
     seatRelease(pcuid);
     released++;
   }
   // A table no seat holds is unreachable from here on (tids are never reused),
   // and a stamp backlog neither a table nor a seat points at is a memory of a
   // match nobody plays. The seat sweep ran first, so a match whose lanes all
-  // went quiet is closed here in one pass.
+  // went quiet is closed here in one pass. But this is the one path that ends a
+  // taikyoku nobody posted end_game for, so archive what it dealt before dropping
+  // it: the lane that backgrounded its tab past the abandon window loses the live
+  // seat, not the settlement and the kifu of the match it was in.
   for (const tid of Array.from(SHARED_TABLES.keys())) {
     if (seatCandidates(tid).length) continue;
+    archiveAbandonedTable(tid, SHARED_TABLES.get(tid), abandoning.get(tid));
     SHARED_TABLES.delete(tid);
     closeStampRoom(tid);
     released++;
@@ -752,6 +779,87 @@ function sweepMatchState(now: number): void {
       `PLAYER_SEAT=${PLAYER_SEAT.size} SHARED_TABLES=${SHARED_TABLES.size} ` +
       `MATCH_LOBBY=${MATCH_LOBBY.size} STAMPS=${STAMPS.size}`);
   }
+}
+
+// The match_archive row for one taikyoku, built the same way by the two paths that
+// reach an end. handle_end_or_kiken calls it for a finish or a resign over the seats
+// still seated; sweepMatchState calls it before reclaiming a table every lane at went
+// quiet on, over the seat records it snapshots just before releasing them. The caller
+// owns the archiveSaved latch. seatFor is the seat held at pindex i, or null for a
+// seat no longer seated (a CPU seat, or - in the sweep - one whose record the release
+// already took): its name/mid/refid/guest then fall back to table.seat_quit, else the
+// seat is recorded as a CPU.
+function writeMatchArchive(table: Table, tid: number, gmode: number, scrambleSchool: string,
+  seatFor: (i: number) => PlayerSeat | null): void {
+  const rows = (table as any).result_rows() as Array<[number, number, number]>;
+  const seats = Number((table as any).seats || 0);
+  const yaku = ((table as any).yakuman || []) as number[];
+  const quit = (table as any).seat_quit || {};
+  const resignedSeats = ((table as any).resigned || []) as number[];
+  const playersInfo = rows.map((r, i) => {
+    const s = seatFor(i);
+    const seatProfile: any = s ? (s as any).profile : null;
+    const q = quit[i];
+    return {
+      pindex: i,
+      name: s ? s.name : (q ? q.name : "CPU"),
+      mid: s ? Number(s.mid || 0) : (q ? q.mid : 0),
+      refid: s ? (String((s as any).refid || "") || String(seatProfile?.refid || "")) : String((q && q.refid) || ""),
+      // What kind of account this seat was, recorded so a guest match cannot
+      // be pulled up later as a card account's record.
+      guest: s ? !!(s as any).guest : (q ? !!q.guest : false),
+      rank: r[0],
+      score: r[1],
+      uma: r[2],
+      yakuman: Number(yaku[i] || 0),
+      buttobi: r[1] < 0,
+      // 棄和: settled last whatever its points said at the time.
+      kiken: resignedSeats.includes(i) ? 1 : 0,
+      // Scramble festival result for this seat (player_record g2_scramble):
+      // the school the match was designated for and whether this seat won it.
+      ...(scrambleSchool ? { scramble: { belong: scrambleSchool, win: r[0] === 0 ? 1 : 0 } } : {}),
+    };
+  });
+  // @ts-ignore
+  // The DB write returns a promise, but this now runs on the polling sweep too, where a
+  // throw must not abort the whole gget: tolerate a non-promise return and a sync throw.
+  try {
+    const p = DB.Insert({
+      collection: 'match_archive',
+      tid,
+      gmode,
+      taku_class: Number((table as any).taku_class || 1) || 1,
+      seats,
+      timestamp: Date.now(),
+      players: playersInfo,
+      // Full cell stream for get_haifu_data replay: same
+      // cell_data_N format the live client already parses.
+      cells: Array.isArray((table as any).cells) ? [...(table as any).cells] : [],
+    });
+    if (p && typeof p.catch === "function") p.catch((e: any) => console.error(e));
+  } catch (e) { console.error(e); }
+}
+
+// Archive a table the sweep is about to drop because every lane at it went quiet.
+// Nothing else records this match: it was never played out (handle_end_or_kiken only
+// archives a naturalFinish) and nobody posts end_game for it - which is the whole
+// reason the sweep exists. Without this the abandoned kyoku is the one silent data
+// loss in the file: a settlement and a kifu for every match the engine ended, nothing
+// for one the server reclaimed out from under a player. The loss stops at the live
+// seat. Skipped when no lane of ours is being abandoned here (a re-seat or a CPU-only
+// table is no player losing a kifu), when the end path already latched it, and when it
+// never dealt a kyoku (no cells, nothing for get_haifu_data to replay). seatsBy names
+// the seats this sweep is releasing for this table, snapshotted before the release.
+function archiveAbandonedTable(tid: number, table: any, seatsBy: Map<number, PlayerSeat> | undefined): void {
+  if (!table || !seatsBy || !seatsBy.size) return;
+  if ((table as any).archiveSaved) return;
+  const cells = (table as any).cells;
+  if (!Array.isArray(cells) || !cells.length) return;
+  (table as any).archiveSaved = true;
+  writeMatchArchive(table, tid, resolveGmode((table as any).gmode, 1), String((table as any).scramble || ""),
+    (i) => seatsBy.get(i) || null);
+  vlog(`[VFG] match-state sweep archived abandoned match tid=${tid} (cells=${cells.length}, ` +
+    `seats=${seatsBy.size}) before reclaiming its table`);
 }
 
 function stampXml(tag: string, tid: number, since: number = 0): string {
@@ -3228,49 +3336,10 @@ export async function handle_end_or_kiken(form: Record<string, string>, ctx: any
   // natural end is what gets recorded.
   if (!(table as any).archiveSaved && naturalFinish) {
     (table as any).archiveSaved = true;
-    const rows = (table as any).result_rows() as Array<[number, number, number]>;
-    const seats = Number((table as any).seats || 0);
-    const yaku = ((table as any).yakuman || []) as number[];
-    const quit = (table as any).seat_quit || {};
-    const resignedSeats = ((table as any).resigned || []) as number[];
-    const playersInfo = rows.map((r, i) => {
+    writeMatchArchive(table, seatInfo.tid, gmode, scrambleSchool, (i) => {
       const atSeat = seatAt(seatInfo.tid, i);
-      const s = atSeat ? atSeat.seat : null;
-      const seatProfile: any = s ? (s as any).profile : null;
-      const q = quit[i];
-      return {
-        pindex: i,
-        name: s ? s.name : (q ? q.name : "CPU"),
-        mid: s ? Number(s.mid || 0) : (q ? q.mid : 0),
-        refid: s ? (String((s as any).refid || "") || String(seatProfile?.refid || "")) : String((q && q.refid) || ""),
-        // What kind of account this seat was, recorded so a guest match cannot
-        // be pulled up later as a card account's record.
-        guest: s ? !!(s as any).guest : (q ? !!q.guest : false),
-        rank: r[0],
-        score: r[1],
-        uma: r[2],
-        yakuman: Number(yaku[i] || 0),
-        buttobi: r[1] < 0,
-        // 棄和: settled last whatever its points said at the time.
-        kiken: resignedSeats.includes(i) ? 1 : 0,
-        // Scramble festival result for this seat (player_record g2_scramble):
-        // the school the match was designated for and whether this seat won it.
-        ...(scrambleSchool ? { scramble: { belong: scrambleSchool, win: r[0] === 0 ? 1 : 0 } } : {}),
-      };
+      return atSeat ? atSeat.seat : null;
     });
-    // @ts-ignore
-    DB.Insert({
-      collection: 'match_archive',
-      tid: seatInfo.tid,
-      gmode,
-      taku_class: Number((table as any).taku_class || 1) || 1,
-      seats,
-      timestamp: Date.now(),
-      players: playersInfo,
-      // Full cell stream for get_haifu_data replay: same
-      // cell_data_N format the live client already parses.
-      cells: Array.isArray((table as any).cells) ? [...(table as any).cells] : [],
-    }).catch((e: any) => console.error(e));
   }
 
   if (!isKiken) {
