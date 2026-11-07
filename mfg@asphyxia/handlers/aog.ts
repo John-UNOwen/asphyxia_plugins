@@ -57,6 +57,7 @@ import {
   MATCHES,
   TABLES,
   MATCH_LOBBY,
+  MATCH_LOBBY_MAX,
   PLAYER_SEAT,
   seatHold,
   seatRelease,
@@ -2497,6 +2498,41 @@ export async function handle_client_state_write(form: Record<string, string>, ct
 // ---------------------------------------------------------------------------
 // match
 // ---------------------------------------------------------------------------
+// MATCH_LOBBY is keyed by the only string in this plugin a caller gets to choose:
+// entry_game builds the room key out of the posted passphrase. Keyed on it
+// verbatim, that meant a request could name a permanent room into existence -
+// one MATCH_LOBBY entry, one PLAYER_SEAT entry holding a profile reference and a
+// table id burned from the counter, per request, with nothing to reclaim them
+// until a seat polled that exact key again (measured: 300 anonymous joins with 300
+// distinct passphrases -> MATCH_LOBBY=300, PLAYER_SEAT=300, tid_counter 1000 ->
+// 1300, no table ever formed; tmp/adv_robust/probe4.cjs).
+//
+// What a real lane can send is narrow, so the shape is checked instead of the
+// value being trusted: the passphrase is the private-match passcode, typed on a
+// tenkey pad that appends nothing past four digits and is only accepted as a
+// 4-digit int in 0..9999 (PrivateMatchTenkeyWindow.cs:57,87), and "no passphrase"
+// is posted as a single space (EntryGame.cs:28). LOBBY_PASSPHRASE_MAX is double
+// the client's four, so a code that arrives padded still matches itself while
+// nothing longer can be a code at all.
+//
+// A value outside that shape is not a passcode, so no room is keyed on it: the
+// entry joins the mode's public pool instead, which cannot grow because it forms
+// a table the moment its seats are filled. Refusing the entry instead would mean
+// answering a non-zero code on an endpoint the client posts with
+// enableErrorScreenTransition:true (MatchingFlow.cs:216) - the ERROR_STOP screen -
+// over a field that cannot be a passcode in the first place.
+const LOBBY_PASSPHRASE_MAX = 8;
+
+function normalizePassphrase(raw: string): { code: string; junk: string } {
+  const v = String(raw || "").trim();
+  if (!v) return { code: "", junk: "" };
+  // Length before the charset test: a field sent at megabyte size is rejected
+  // without ever being walked, and the log names its size rather than its bytes.
+  if (v.length > LOBBY_PASSPHRASE_MAX) return { code: "", junk: `${v.length} chars` };
+  if (!/^[0-9]+$/.test(v)) return { code: "", junk: `${v.length} chars, not the client's digits` };
+  return { code: v, junk: "" };
+}
+
 export async function handle_entry_game(form: Record<string, string>, ctx: any): Promise<void> {
   // Matching is where the cost of a hoarder process shows first: every seat
   // lookup and lobby scan below gets slower with everything never released.
@@ -2506,13 +2542,35 @@ export async function handle_entry_game(form: Record<string, string>, ctx: any):
   const pcuid = formGet(form, "pcuid");
   // NOTE: the client always sends passphrase=<space> when no passphrase was
   // entered — trim it or every public lobby collapses into one shared key.
-  const passphrase = formGet(form, "passphrase").trim();
+  const pass = normalizePassphrase(formGet(form, "passphrase"));
+  if (pass.junk) {
+    vlog(`[VFG] entry passphrase rejected (${pass.junk}): no room is keyed on it, this entry joins the public pool of gmode=${gmode}`);
+  }
+  const passphrase = pass.code;
   const seats = GMODE_SEATS[gmode];
   const profile = await getProfileBySession(pcuid);
-  // No profile behind the session: mid 0, never 1. mid 1 is a legal mid for a
-  // real account, and an entry that stamps mid 1 onto its seat stamps it onto the
-  // match archive afterwards - which is how an anonymous match ended up attributed
-  // to that account's records.
+  // A room, a seat and a table id outlive the request that asked for them, so
+  // they need an account behind them. This handler used to carry on with mid 0
+  // and an empty refid when the session resolved to no profile and seat the caller
+  // anyway, so anyone who could post a form minted server state at request rate
+  // (probe4.cjs: 300 such joins -> 300 rooms, 300 seats, 300 burned tids). There is
+  // no anonymous matching in this game to preserve: every lane logs in before it
+  // matches, and even the guest flow gets a profile of its own (a shared guest
+  // DataID), so a session that resolves to nothing is not a player in the waiting
+  // room - it is whoever is posting the form. 770 is the client's own "this session
+  // is gone" answer (the same code gget gives when the seat behind a poll has been
+  // released); the lane is already at MatchingFlow, which handles a non-zero code
+  // here by leaving the match, whereas code 0 would park the client on a seat this
+  // server refuses to remember and then invent every answer for.
+  if (!profile) {
+    vlog(`[VFG] entry refused: session ${String(pcuid).slice(0, 8)}... has no account behind it -> no seat, no room, no tid (serv_st ${SERV_ST_SESSION_LOST})`);
+    sendXml(ctx, xml_error(SERV_ST_SESSION_LOST));
+    return;
+  }
+  // Never 1. mid 1 is a legal mid for a real account, and an entry that stamps
+  // mid 1 onto its seat stamps it onto the match archive afterwards - which is how
+  // an anonymous match ended up attributed to that account's records. 0 now only
+  // reaches here for a profile document that has no player_id.
   const mid = Number((profile as any)?.player_id || 0) || 0;
   const refid = String((profile as any)?.refid || "");
   const guest = !!(profile as any)?.is_guest;
@@ -2530,7 +2588,10 @@ export async function handle_entry_game(form: Record<string, string>, ctx: any):
   const schoolSetting = scrambleSchoolSetting();
   const scramble = teammatch > 0 && schoolSetting ? schoolSetting : "";
 
-  const lobbyKey = passphrase ? `${gmode}_${passphrase}` : `${gmode}`;
+  // let, not const: a room may be folded into the mode's public pool below when
+  // the room budget is spent, and every use of this value (the seat's lobbyKey,
+  // the prune, the table formation) has to name the room the caller was put in.
+  let lobbyKey = passphrase ? `${gmode}_${passphrase}` : `${gmode}`;
 
 function sendDiscordWebhook(url: string, payload: any) {
   try {
@@ -2580,6 +2641,22 @@ function sendDiscordWebhook(url: string, payload: any) {
     let lobby = MATCH_LOBBY.get(lobbyKey);
     if (lobby) {
       await pruneLobbyMembers(lobbyKey, lobby, "entry");
+    }
+    // The room budget (utils.ts MATCH_LOBBY_MAX) is checked where a room is
+    // created, because that is the one place a caller can ask for a unit of
+    // server state by name. Past the budget no new key is minted: the entry joins
+    // the mode's public pool, one key per mode that cannot grow because it forms a
+    // table the moment its seats fill, while the sweep that already ran above
+    // reclaims the idle rooms this entry was competing with for the budget. The
+    // public pool itself is allowed to exist over the budget - being unable to
+    // start a default match is not a failure this cap should ever hand a player.
+    if (!lobby && MATCH_LOBBY.size >= MATCH_LOBBY_MAX && lobbyKey !== String(gmode)) {
+      vlog(`[VFG] entry room budget spent (${MATCH_LOBBY.size} rooms at the cap): ${lobbyKey} joins the public pool of gmode=${gmode} instead of a new room`);
+      lobbyKey = String(gmode);
+      lobby = MATCH_LOBBY.get(lobbyKey);
+      if (lobby) {
+        await pruneLobbyMembers(lobbyKey, lobby, "entry");
+      }
     }
     if (!lobby) {
       const cTime = nowUnix();

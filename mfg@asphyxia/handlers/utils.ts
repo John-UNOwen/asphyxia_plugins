@@ -1009,11 +1009,24 @@ export function pruneOdekakeGrants(viewer: any, keepRefids: string[]): boolean {
 export const MATCHES: Map<string, any> = new Map();
 // MATCH_LOBBY: lobbyKey -> { pcuids: string[], tid: number, createdAt: number }
 export const MATCH_LOBBY: Map<string, { pcuids: string[]; tid: number; createdAt: number }> = new Map();
+// How many rooms this map may hold at once. Its key is the only one in the plugin
+// a caller picks (entry_game builds it from the posted passphrase), so a room -
+// with the seat and the table id behind it - is a unit of server state a request
+// can ask for by name. entry_game checks this before minting a new key and folds
+// the entry into the mode's public pool when the budget is spent. 512 is a
+// backstop, not a policy: a room only exists for the <=60 s matching window it is
+// waiting in, the shipping client can only address a 4-digit passcode
+// (PrivateMatchTenkeyWindow.cs:57), and 512 rooms x 4 seats is more simultaneous
+// waiting players than this deployment can connect. What it does bound is the cost
+// every entry and every poll pays walking the map, which is what made an
+// unbounded MATCH_LOBBY a matching slowdown and not just a memory leak.
+export const MATCH_LOBBY_MAX = 512;
 // PLAYER_SEAT: pcuid -> the seat this session holds. tid/pindex are what gget and
 // gpost address against, refid/guest are what the match archive attributes the
 // result to (see handle_end_or_kiken), taku_class is the entry's table class.
-// mid 0 means "no profile behind this seat": it must never be 1, because 1 can be
-// a real account's mid and would attribute the seat to that account.
+// mid 0 means "the profile behind this seat has no player_id" (entry_game no
+// longer seats a session with no profile at all): it must never be 1, because 1
+// can be a real account's mid and would attribute the seat to that account.
 export interface PlayerSeat {
   tid: number;
   pindex: number;
