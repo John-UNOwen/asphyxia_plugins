@@ -27,6 +27,7 @@ import {
   CARD_STORE,
   CARD_STORE_BY_REFID,
   nowUnix,
+  newHexId,
   newRefid,
   sanitizePin,
   playerIdFromRefid,
@@ -674,8 +675,9 @@ async function handleEacoin(info: any, data: any, send: any): Promise<void> {
   const shortSess = (s: string) => String(s || "").slice(0, 8) + "...";
   vlog(`[eacoin] ${method} sess=${shortSess(getChild("sessid"))} payment=${getChild("payment") || 0}`);
   if (method === "checkin" || method === "opcheckin") {
-    // generate sessid
-    const sess = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+    // generate sessid: the PASELI session, CSPRNG-minted (utils.ts newHexId) -
+    // consume/checkout/getbalance look it up by this value alone.
+    const sess = newHexId(16);
     PASELI_SESSIONS.set(sess, PASELI_BALANCE);
     vlog(`[eacoin] ${method} -> new sess=${shortSess(sess)} balance=${PASELI_BALANCE}`);
     if (method === "opcheckin") {

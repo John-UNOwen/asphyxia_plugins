@@ -220,14 +220,42 @@ export function playerIdFromRefid(refid: string): number {
   return (h >>> 0 & 0x7fffffff) || 1;
 }
 
+// ---------------------------------------------------------------------------
+// CSPRNG minting: the only source any value this plugin hands out may come from
+// when that value is later read back as proof of who a request is. That set is
+// profile.session_id (the account selector every session-keyed handler resolves
+// through - getProfileBySession above, and mid is not an identity), a minted
+// DataID (the account name its owner logs in with), the e-Amusement / PASELI
+// sessid (what authorises spending on that check-in), and the gacha transaction
+// / request ids (a pending draw is looked up by the id alone, no owner check).
+// Math.random cannot mint any of them: V8 feeds the whole isolate from one
+// xorshift128+ generator seeded once at startup, so the stream is a
+// deterministic function of that seed - measured, two cores started with the
+// same --random_seed minted byte-identical sessions and DataIDs
+// (tmp/csprng_fix/repro.cjs `seeded`) - and its state is recoverable from a
+// handful of consecutive outputs, so a predicted session id is a full account
+// read/write (CWE-338). node:crypto is the CSPRNG; the shapes below stay exactly
+// what the shipping client and the stored documents already expect.
+// ---------------------------------------------------------------------------
+const CSPRNG = require("crypto");
+
+/** `n` random hex characters from the CSPRNG - one uniform nibble per byte half. */
+export function newHexId(n: number, upper: boolean = false): string {
+  const bytes = CSPRNG.randomBytes(Math.ceil(n / 2));
+  const digits = upper ? "0123456789ABCDEF" : "0123456789abcdef";
+  let out = "";
+  for (let i = 0; i < n; i++) out += digits[(i & 1) ? (bytes[i >> 1] & 0x0f) : (bytes[i >> 1] >> 4)];
+  return out;
+}
+
+/** Uniform random integer in [0, maxExclusive) from the CSPRNG. */
+export function newDecimalId(maxExclusive: number): number {
+  return CSPRNG.randomInt(maxExclusive);
+}
+
 export function newRefid(): string {
-  const len = 16;
-  // Asphyxia style: letter + 15 hex
-  // use random hex
-  const hex = "0123456789ABCDEF";
-  let r = "A";
-  for (let i = 1; i < len; i++) r += hex[Math.floor(Math.random() * 16)];
-  return r;
+  // Asphyxia style: letter + 15 hex, minted from the CSPRNG block above.
+  return "A" + newHexId(15, true);
 }
 
 export function pcode(refid: string): string {

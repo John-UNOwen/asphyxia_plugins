@@ -32,6 +32,8 @@ import {
   parseMust,
   mustInt,
   nowUnix,
+  newHexId,
+  newDecimalId,
   playerIdFromRefid,
   ensureProfile,
   getProfileByRefid,
@@ -1426,7 +1428,10 @@ export async function handle_login(form: Record<string, string>, ctx: any): Prom
     sendXml(ctx, xml_error(SERV_ST_ACCOUNT_NOT_FOUND));
     return;
   }
-  const session = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  // The pcuid every later request returns as its identity, minted from the
+  // CSPRNG (utils.ts newHexId): a session drawn from Math.random is a
+  // predictable bearer credential, not a session (see the minting block there).
+  const session = newHexId(32);
   // Never write "PLAYER" as profile.name here: that masked real registrations
   // (DB showed name=PLAYER forever, real name only inside states). Login only
   // rotates the session; create_player owns the name.
@@ -1606,7 +1611,10 @@ export async function handle_create_player(form: Record<string, string>, ctx: an
     // name lands on the SAME profile that login created (not a random fork).
     rawId = sessionRef;
   }
-  if (!rawId) rawId = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  // Nothing names the account, so this is a registration: mint a fresh DataID
+  // from the CSPRNG (utils.ts newHexId), so the account name nobody chose is not
+  // one an observer of this process can also compute.
+  if (!rawId) rawId = newHexId(16);
   const userId = String(rawId).trim().toUpperCase();
   // Same rule as /login (see handle_login): a MID-prefixed refid is the shape of
   // the removed orphan fork, so registration may not mint one either - at any
@@ -3297,7 +3305,8 @@ export async function handle_gacha_info(form: Record<string, string>, ctx: any):
 }
 
 export async function handle_req_draw_gacha(form: Record<string, string>, ctx: any): Promise<void> {
-  const txn = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  // The draw transaction, CSPRNG-minted like every other identifier here.
+  const txn = newHexId(16);
   const p = await getProfileBySession(formGet(form, "pcuid"));
   if (p) {
     (p as any).gacha_txn = { id: txn, gacha: formGet(form, "gacha_name"), times: Number(formGet(form, "times") || 1) || 1 };
@@ -3308,7 +3317,7 @@ export async function handle_req_draw_gacha(form: Record<string, string>, ctx: a
 
 export async function handle_get_gacha_result(form: Record<string, string>, ctx: any): Promise<void> {
   const times = Number(formGet(form, "times") || 1) || 1;
-  const rows = Array.from({ length: Math.max(1, Math.min(times, 5)) }, () => `<data><character_id>0</character_id><unique_id>${Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}</unique_id></data>`).join("");
+  const rows = Array.from({ length: Math.max(1, Math.min(times, 5)) }, () => `<data><character_id>0</character_id><unique_id>${newHexId(12)}</unique_id></data>`).join("");
   sendXml(ctx, xml_response(`<lottery_result>${rows}</lottery_result><gift><acquired>0</acquired><prev>0</prev><after>0</after></gift>`));
 }
 
@@ -3474,7 +3483,10 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
     try { await saveProfile((profile as any).refid, profile); } catch { }
   }
   vlog(`[VFG] gacha_draw id=${gachaId} type=${stype} rolled=${rolled.join(",")} spirits=${spirits.join(",")} gift_type=[${giftTypes.join(",")}] gift=${gift} config_gift=${configGifts} dropped=${unpayable} unlocked=[${unlockedChars.join(",")}] present01=${giftCount}`);
-  const reqId = Math.floor(Math.random() * 1000000000).toString();
+  // The id cutin_gacha_play_apply names a pending draw with. The lookup has no
+  // owner check, so the id itself is what keeps one account's draw state out of
+  // another's hands: CSPRNG (utils.ts newDecimalId), same 9-digit decimal shape.
+  const reqId = String(newDecimalId(1000000000));
   try {
     // Same-session check first, then any stale pending (covers game restart
     // after a freeze: new pcuid, old draw still without apply).
