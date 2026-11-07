@@ -517,35 +517,73 @@ export async function ensureProfile(refid: string, name: string = "GUEST"): Prom
     states: { music_gacha: musicGachaSeedState() },
     created_at: nowUnix(),
   };
-  try {
-    await ensureCoreAlias(norm);
-    // @ts-ignore - refid-first upsert targets ProfileSpace
-    await DB.Upsert(norm, { collection: "profile" }, doc);
-  } catch (e: any) {
-    vlog(`[VFG] profile upsert failed refid=${norm}: ${e && e.message ? e.message : e}`);
+  // The mint is only an account once the document is on storage. This used to
+  // swallow the failed upsert and still _cacheProfile(doc) + return doc, so /login
+  // and /create_player handed out a live session - and a live in-memory account -
+  // for a document that does not exist in the savedata: the whole login session
+  // then reads and writes state that no restart survives, while every write still
+  // answered code 0. Callers already answer null with an error code (login
+  // SERV_ST_ACCOUNT_NOT_FOUND, create_player the same, the presenter a refusal).
+  if (!(await saveProfile(norm, doc))) {
+    vlog(`[VFG] profile mint refused refid=${norm}: the new document is not on storage - no account, no session`);
+    return null;
   }
-  _cacheProfile(doc);
   return doc;
 }
 
-export async function saveProfile(refid: string, doc: ProfileDoc): Promise<void> {
+// True only when the core confirms the document is in storage. Both of the write
+// failures this deployment actually logs RESOLVE instead of rejecting, so awaiting
+// the call says nothing on its own:
+//   - APIUpsert's FindProfile guard cancels a refid upsert with
+//     {updated:0, docs:[], upsert:false} plus Logger.warn "refid does not exists,
+//     upsert operation canceled" (src/utils/EamuseIO.ts:1388-1396 - 80 of those
+//     lines in dist/log.txt), and
+//   - the plugin-facing wrapper resolves its poisoned default object whenever it
+//     cannot detect the calling plugin - the same {updated:0, docs:[], upsert:false}
+//     with Logger.error "DB.Upsert unexpected error" (ExternalPluginLoader.ts:77-86,
+//     :157; the sibling "DB.Find unexpected error" appears 177 times in that log).
+// Only a genuine DB fault rejects, which is what the try/catch below is for.
+// A write that landed always says updated >= 1: the store is asked with
+// {upsert:true, multi:true, returnUpdatedDocs:true} and returns the written docs
+// (SqliteStore.ts:504-546 via EamuseIO.ts:1425-1437). Same test
+// _repairPhantomOnTouch already applies to DB.Update.
+function writeLanded(res: any): boolean {
+  return !!res && Number((res as any).updated) >= 1;
+}
+
+// Persist the document, and report whether storage took it. The return value is
+// the point: a caller that answers the shipping client must not claim a write the
+// core cancelled - the client's only save-failure channel is a non-zero serv_st
+// (NetworkResponseException -> PlayerConfig.IsDataSaveFailed -> GameoverFlow's
+// m_dataSaveFailed), and a code 0 over an unwritten profile leaves it unarmed while
+// the account silently keeps its old state. Callers with no way to tell the client
+// (a cache refresh in get_menudata, an ack) keep ignoring it.
+export async function saveProfile(refid: string, doc: ProfileDoc): Promise<boolean> {
   const norm = normalizeRefid(refid) || normalizeRefid((doc as any).refid) || "GUEST";
   // Last-line write barrier: every profile document in the plugin is persisted
-  // through this function (ensureProfile's own upsert is the only other one, and it
-  // refuses the whole MID + digits family), so no code path - session resolver, mid
-  // lookup, state helper, core alias - can leave a byte on a legacy MID phantom
-  // document.
-  if (isPhantomRefid(norm)) { _refusePhantomProfile(norm, "saveProfile"); return; }
+  // through this function (ensureProfile mints through it too), so no code path -
+  // session resolver, mid lookup, state helper, core alias - can leave a byte on a
+  // legacy MID phantom document.
+  if (isPhantomRefid(norm)) { _refusePhantomProfile(norm, "saveProfile"); return false; }
   (doc as any).refid = norm;
   (doc as any).updated_at = nowUnix();
+  let res: any = null;
   try {
     await ensureCoreAlias(norm);
     // @ts-ignore
-    await DB.Upsert(norm, { collection: "profile" }, doc);
+    res = await DB.Upsert(norm, { collection: "profile" }, doc);
   } catch (e: any) {
-    vlog(`[VFG] profile save failed refid=${norm}: ${e && e.message ? e.message : e}`);
+    vlog(`[VFG] profile save failed refid=${norm}: ${e && e.message ? e.message : e} (state NOT on storage)`);
+    return false;
   }
+  if (!writeLanded(res)) {
+    vlog(`[VFG] profile save cancelled refid=${norm}: DB.Upsert answered updated=${res ? (res as any).updated : "null"} (no core refid alias, or the core refused the write) - state NOT on storage`);
+    return false;
+  }
+  // Only a document storage took is an account this process may get to know.
+  // Caching an unwritten one is how a login session ran entirely in memory.
   _cacheProfile(doc);
+  return true;
 }
 
 // Documents the removed saveState fork used to mint for a mid that matched no
@@ -792,25 +830,28 @@ export async function resolveProfile(mid: number, pcuid?: string): Promise<Profi
   return await sessionProfile(pcuid);
 }
 
-// Write a state onto an already-resolved profile and return that profile, so
-// the caller mirrors/answers against the exact document it wrote.
-export async function saveStateOn(p: ProfileDoc, kind: string, payload: string): Promise<ProfileDoc> {
+// Write a state onto an already-resolved profile and report whether storage took
+// it. The caller is the one answering the client, so a cancelled write has to be
+// visible at this seam: saveProfile resolved into a void here, so client_state_write
+// answered code 0 for a state that never reached the savedata and the account kept
+// its old state while the client believed it had saved.
+export async function saveStateOn(p: ProfileDoc, kind: string, payload: string): Promise<boolean> {
   if (!(p as any).states) (p as any).states = {};
   (p as any).states[kind] = payload;
   (p as any).updated_at = nowUnix();
-  await saveProfile((p as any).refid, p);
-  return p;
+  return await saveProfile((p as any).refid, p);
 }
 
 // Returns the profile the state landed on, or null when the write has no real
-// account behind it. A missing profile is NEVER repaired by minting a
-// MID phantom document: those forked profiles (and the refused mid=1 writes that
-// still answered code 0) are exactly how states were written into phantom
-// profiles and quietly lost. The caller must answer with an error code.
+// account behind it, or storage did not take it. A missing profile is NEVER
+// repaired by minting a MID phantom document: those forked profiles (and the
+// refused mid=1 writes that still answered code 0) are exactly how states were
+// written into phantom profiles and quietly lost. The caller must answer with an
+// error code.
 export async function saveState(mid: number, kind: string, payload: string, pcuid?: string): Promise<ProfileDoc | null> {
   const p = await resolveProfile(mid, pcuid);
   if (!p) return null;
-  return await saveStateOn(p, kind, payload);
+  return (await saveStateOn(p, kind, payload)) ? p : null;
 }
 
 // ---------------------------------------------------------------------------

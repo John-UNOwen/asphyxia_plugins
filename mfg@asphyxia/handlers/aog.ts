@@ -2490,7 +2490,21 @@ export async function handle_client_state_write(form: Record<string, string>, ct
     return;
   }
 
-  await saveStateOn(profile, kind, decoded);
+  // The state has to be in storage before this answers code 0. The core cancels
+  // profile upserts it has no refid alias for (EamuseIO.ts:1388-1396) and its
+  // plugin-facing wrapper hands back a poisoned {updated:0} on a lost caller
+  // context, both as a resolved value - so an awaited save says nothing until its
+  // result is read. Answering code 0 over a state that never landed left the
+  // client's own save-failure channel unarmed (ClientStateWrite.Send is posted with
+  // enableErrorScreenTransition:false, so the non-zero code becomes the
+  // NetworkResponseException that PlayerGameData.cs:440-444 / ResultFlow.cs:241-245
+  // turn into PlayerConfig.IsDataSaveFailed and GameoverFlow.cs:29 renders): the
+  // account silently kept its old state and nothing anywhere reported the loss.
+  if (!(await saveStateOn(profile, kind, decoded))) {
+    vlog(`[VFG] client_state_write kind=${kind} mid=${mid} refid=${(profile as any).refid}: NOT STORED -> serv_st ${SERV_ST_STATE_INVALID} (client save-failure channel armed; last-good state kept on disk)`);
+    sendXml(ctx, xml_error(SERV_ST_STATE_INVALID));
+    return;
+  }
   sendXml(ctx, xml_response());
 }
 
