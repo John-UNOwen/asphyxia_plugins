@@ -1123,11 +1123,27 @@ const SEATS_BY_TID: Map<number, Set<string>> = new Map();
 
 export function seatHold(pcuid: string, seat: PlayerSeat): void {
   const key = String(pcuid);
+  const previous = PLAYER_SEAT.get(key);
   PLAYER_SEAT.set(key, seat);
   // A seat is only ever aged against lastSeen; an install without one would read
   // as "seen right now" forever through seatSeen's fallback and never be swept.
   if (!(seat as any).lastSeen) (seat as any).lastSeen = Date.now();
   const tid = Number(seat.tid) || 0;
+  // A session holds one seat, so re-seating replaces the record PLAYER_SEAT keeps
+  // for it - and that record was the only thing naming the table it sat at before.
+  // Un-index the key from that old table here, because seatRelease only ever removes
+  // a key from the tid the *current* record names, so the old entry would survive it
+  // forever, and every "does any seat still hold this table" count (sweepMatchState,
+  // the end_game release) would see a member the account no longer sits at and pin a
+  // closed table - engine state, stamp room, cursors - for the life of the session.
+  const oldTid = previous ? Number(previous.tid) || 0 : 0;
+  if (oldTid && oldTid !== tid) {
+    const was = SEATS_BY_TID.get(oldTid);
+    if (was) {
+      was.delete(key);
+      if (!was.size) SEATS_BY_TID.delete(oldTid);
+    }
+  }
   let at = SEATS_BY_TID.get(tid);
   if (!at) { at = new Set(); SEATS_BY_TID.set(tid, at); }
   at.add(key);
