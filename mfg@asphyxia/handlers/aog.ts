@@ -58,6 +58,9 @@ import {
   TABLES,
   MATCH_LOBBY,
   PLAYER_SEAT,
+  seatHold,
+  seatRelease,
+  seatCandidates,
   SHARED_TABLES,
   CARD_STORE_BY_REFID,
   allocateTid,
@@ -400,8 +403,9 @@ export async function matchSeat(pcuid: string, tid: number, claimedPindex: numbe
   const refid = normalizeRefid(String((prof as any)?.refid || ""));
   if (refid && tid) {
     let held: { pcuid: string; seat: PlayerSeat } | null = null;
-    for (const [otherPcuid, other] of PLAYER_SEAT.entries()) {
-      if (Number(other.tid) !== Number(tid)) continue;
+    for (const otherPcuid of seatCandidates(tid)) {
+      const other = PLAYER_SEAT.get(otherPcuid);
+      if (!other) continue;
       if (normalizeRefid(String((other as any).refid || "")) !== refid) continue;
       if (!held || seatSeen(other) > seatSeen(held.seat)) held = { pcuid: String(otherPcuid), seat: other };
     }
@@ -416,8 +420,8 @@ export async function matchSeat(pcuid: string, tid: number, claimedPindex: numbe
         if (at >= 0) heldLobby.pcuids[at] = String(pcuid);
         else heldLobby.pcuids.push(String(pcuid));
       }
-      PLAYER_SEAT.delete(held.pcuid);
-      PLAYER_SEAT.set(String(pcuid), held.seat);
+      seatRelease(held.pcuid);
+      seatHold(String(pcuid), held.seat);
       (held.seat as any).lastSeen = Date.now();
       vlog(`[VFG] ${tag} tid=${tid} seat ${held.seat.pindex} (${held.seat.name}) moves to this account's ` +
         `new session ${String(pcuid).slice(0, 8)}...`);
@@ -446,6 +450,20 @@ export async function matchSeat(pcuid: string, tid: number, claimedPindex: numbe
 // the client itself counts down, which is also what the disconnect conversion below uses.
 const SEAT_SILENCE_MS = LOBBY_FORCE_SECONDS * 1000;
 
+// How long a seat record survives once nothing addresses it any more. The silence
+// window above only hands the seat to a CPU and deliberately keeps the record, so
+// a reconnect can give it back; this longer window is the point where that
+// reconnect is over. Without it a lane that never posts end_game (this client only
+// posts it from the result screen - a closed tab never does) kept its seat, its
+// profile reference, the table behind the seat and that table's stamp backlog for
+// the life of the process.
+const SEAT_ABANDON_MS = SEAT_SILENCE_MS * 5;
+
+// A sweep is as cheap as walking the seated sessions, so it does not need to run
+// on every poll: matching and polling ask for it, and this interval bounds what
+// that costs while the maps stay small under the sweep anyway.
+const MATCH_SWEEP_INTERVAL_MS = 5000;
+
 function seatSeen(seat: PlayerSeat | null): number {
   const seen = Number((seat as any)?.lastSeen || 0);
   return seen > 0 ? seen : Date.now();
@@ -464,8 +482,9 @@ function seatIsSilent(seat: PlayerSeat | null): boolean {
 function seatAt(tid: number, index: number): { pcuid: string; seat: PlayerSeat; evicted: boolean; silent: boolean } | null {
   let best: { pcuid: string; seat: PlayerSeat; evicted: boolean; silent: boolean } | null = null;
   let bestRank = -1;
-  for (const [pcuid, seat] of PLAYER_SEAT.entries()) {
-    if (Number(seat.tid) !== Number(tid) || Number(seat.pindex) !== Number(index)) continue;
+  for (const pcuid of seatCandidates(tid)) {
+    const seat = PLAYER_SEAT.get(pcuid);
+    if (!seat || Number(seat.pindex) !== Number(index)) continue;
     const evicted = isEvictedSession(String(pcuid));
     const silent = seatIsSilent(seat);
     const cand = { pcuid: String(pcuid), seat, evicted, silent };
@@ -500,7 +519,7 @@ async function pruneLobbyMembers(lobbyKey: string, lobby: { pcuids: string[]; ti
       // An entry left behind by a lane that is no longer addressing the room: the same
       // window the engine gives a seat before handing it to a CPU. A seat that is being
       // polled stays, including one whose session a relogin retired.
-      PLAYER_SEAT.delete(pcuid);
+      seatRelease(pcuid);
       dropped.push(pcuid);
       continue;
     }
@@ -509,7 +528,7 @@ async function pruneLobbyMembers(lobbyKey: string, lobby: { pcuids: string[]; ti
       // The same account holding two seats because it logged in twice: the newer
       // session's seat is the one that stays.
       const older = taken.get(refid) as string;
-      PLAYER_SEAT.delete(older);
+      seatRelease(older);
       dropped.push(older);
       taken.set(refid, pcuid);
       live.push(pcuid);
@@ -581,8 +600,8 @@ async function returningSeat(
       if (at >= 0) backLobby.pcuids[at] = String(pcuid);
       else backLobby.pcuids.push(String(pcuid));
     }
-    PLAYER_SEAT.delete(String(best.pcuid));
-    PLAYER_SEAT.set(String(pcuid), {
+    seatRelease(String(best.pcuid));
+    seatHold(String(pcuid), {
       tid: backTid, pindex: backIndex, name, mid, profile, lobbyKey: backKey,
       gmode, taku_class, refid, guest, scramble,
     });
@@ -639,6 +658,76 @@ function closeStampRoom(tid: number): void {
   const prefix = `${Number(tid) || 0}|`;
   for (const key of Array.from(STAMP_CURSOR.keys())) {
     if (String(key).startsWith(prefix)) STAMP_CURSOR.delete(key);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// match-state sweep
+// ---------------------------------------------------------------------------
+// The handlers above reclaim state only on the paths a cooperative client walks:
+// end_game releases a seat, closeStampRoom needed every seat gone first, and
+// SHARED_TABLES - the one map holding a whole match's cell stream - had no delete
+// call at all. A closed tab, a reload away from the result screen, or a crash
+// therefore kept the seat, the table behind it and every stamp room hanging off
+// it for the life of the process. The sweep is the reclamation for those lanes:
+// every rule is keyed on activity the handlers already record (a seat's lastSeen,
+// refreshed by matchSeat on each gget/gpost/end_game), and it runs inline on the
+// two paths that create the demand - matching and polling - at most once per
+// interval. A lane that still polls keeps its seat fresh and is never swept.
+let _matchSweepAt = 0;
+function maybeSweepMatchState(): void {
+  const now = Date.now();
+  if (now - _matchSweepAt < MATCH_SWEEP_INTERVAL_MS) return;
+  _matchSweepAt = now;
+  sweepMatchState(now);
+}
+
+function sweepMatchState(now: number): void {
+  let released = 0;
+  // A seat nobody has addressed since past the abandon window is a lane that is
+  // not coming back: drop it (and with it the ProfileDoc reference it holds).
+  for (const [pcuid, seat] of Array.from(PLAYER_SEAT.entries())) {
+    if (now - seatSeen(seat) <= SEAT_ABANDON_MS) continue;
+    seatRelease(pcuid);
+    released++;
+  }
+  // A table no seat holds is unreachable from here on (tids are never reused),
+  // and a stamp backlog neither a table nor a seat points at is a memory of a
+  // match nobody plays. The seat sweep ran first, so a match whose lanes all
+  // went quiet is closed here in one pass.
+  for (const tid of Array.from(SHARED_TABLES.keys())) {
+    if (seatCandidates(tid).length) continue;
+    SHARED_TABLES.delete(tid);
+    closeStampRoom(tid);
+    released++;
+  }
+  for (const tid of Array.from(STAMPS.keys())) {
+    if (SHARED_TABLES.has(tid) || seatCandidates(tid).length) continue;
+    closeStampRoom(tid);
+    released++;
+  }
+  // A seat that moved to a fresh session (relogin handover) leaves its delivery
+  // cursor under the retired pcuid; nobody reads that key again.
+  for (const key of Array.from(STAMP_CURSOR.keys())) {
+    const bar = String(key).indexOf("|");
+    if (bar >= 0 && !PLAYER_SEAT.has(String(key).slice(bar + 1))) STAMP_CURSOR.delete(key);
+  }
+  // A lobby only exists for the members seated in it; with abandoned seats gone
+  // above, whatever no longer has its seat has no claim on the room.
+  for (const [key, lobby] of Array.from(MATCH_LOBBY.entries())) {
+    lobby.pcuids = lobby.pcuids.filter((id: string) => {
+      const s = PLAYER_SEAT.get(String(id));
+      return !!s && Number(s.tid) === Number(lobby.tid) && String((s as any).lobbyKey || "") === String(key);
+    });
+    if (!lobby.pcuids.length) {
+      MATCH_LOBBY.delete(key);
+      released++;
+    }
+  }
+  if (released) {
+    vlog(`[VFG] match-state sweep released ${released} unreachable record(s): ` +
+      `PLAYER_SEAT=${PLAYER_SEAT.size} SHARED_TABLES=${SHARED_TABLES.size} ` +
+      `MATCH_LOBBY=${MATCH_LOBBY.size} STAMPS=${STAMPS.size}`);
   }
 }
 
@@ -2409,6 +2498,9 @@ export async function handle_client_state_write(form: Record<string, string>, ct
 // match
 // ---------------------------------------------------------------------------
 export async function handle_entry_game(form: Record<string, string>, ctx: any): Promise<void> {
+  // Matching is where the cost of a hoarder process shows first: every seat
+  // lookup and lobby scan below gets slower with everything never released.
+  maybeSweepMatchState();
   const gmode = resolveGmode(formGet(form, "gmode"), 1);
   const taku_class = Number(formGet(form, "taku_class") || 1) || 1;
   const pcuid = formGet(form, "pcuid");
@@ -2477,7 +2569,7 @@ function sendDiscordWebhook(url: string, payload: any) {
     tid = await allocateTid();
     const taku = GMODE_TAKU[gmode] ?? 0;
     ensureSharedTable(tid, taku, [0], { gmode, taku_class, scramble });
-    PLAYER_SEAT.set(pcuid, { tid, pindex: 0, name, mid, profile, lobbyKey: `solo_${tid}`, gmode, taku_class, refid, guest, scramble });
+    seatHold(pcuid, { tid, pindex: 0, name, mid, profile, lobbyKey: `solo_${tid}`, gmode, taku_class, refid, guest, scramble });
     vlog(`[VFG] solo 2P table tid=${tid} name=${name} mid=${mid} gmode=${gmode}${scramble ? " scramble=" + scramble : ""}`);
   } else {
     const back = await returningSeat(refid, pcuid, lobbyKey, name, mid, profile, gmode, taku_class, guest, scramble);
@@ -2559,7 +2651,7 @@ function sendDiscordWebhook(url: string, payload: any) {
 
     pindex = lobby.pcuids.indexOf(pcuid);
     tid = lobby.tid;
-    PLAYER_SEAT.set(pcuid, { tid: lobby.tid, pindex, name, mid, profile, lobbyKey, gmode, taku_class, refid, guest, scramble });
+    seatHold(pcuid, { tid: lobby.tid, pindex, name, mid, profile, lobbyKey, gmode, taku_class, refid, guest, scramble });
     (PLAYER_SEAT.get(pcuid) as any).lastSeen = Date.now();
     // Which table this entry landed in and which seat it was given: without this a
     // matching run cannot be read back at all, and "did these lanes share a table" is
@@ -2595,6 +2687,10 @@ export async function handle_reconnect(form: Record<string, string>, ctx: any): 
 }
 
 export async function handle_gget(form: Record<string, string>, ctx: any): Promise<void> {
+  // A process that only runs matches never sees entry_game again, so polling has
+  // to carry the sweep too: the lanes polling now pay for it at most once per
+  // interval, and the lanes that are gone stop being remembered.
+  maybeSweepMatchState();
   const pcuid = formGet(form, "pcuid");
   const ready = formGet(form, "ready") === "1";
   const parts = parseMust(form);
@@ -2659,7 +2755,7 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
             // Away and no live session stands behind the seat any more: this lane is not
             // coming back to this table, so the seat itself is released. A seat that is
             // only silent keeps its record - reconnect hands that seat back to the player.
-            PLAYER_SEAT.delete(heldSeat.pcuid);
+            seatRelease(heldSeat.pcuid);
             vlog(`[VFG] tid=${seatInfo.tid} seat ${h_seat} released: no session behind it`);
           }
           
@@ -2716,7 +2812,7 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
         // answer in the same breath, so both sides describe the same seat. A seat that is
         // still being polled stays a human seat whatever happened to the session that
         // first took it.
-        if (held && held.evicted) PLAYER_SEAT.delete(held.pcuid);
+        if (held && held.evicted) seatRelease(held.pcuid);
         (table as any).humans = ((table as any).humans || []).filter((h: any) => Number(h) !== i);
         humanSeats.delete(i);
         vlog(`[VFG] gget tid=${seatInfo.tid} seat ${i} unaddressed for ${SEAT_SILENCE_MS / 1000}s, handed to CPU`);
@@ -2889,7 +2985,8 @@ export async function handle_end_or_kiken(form: Record<string, string>, ctx: any
     const quit = (table as any).seat_quit || {};
     const resignedSeats = ((table as any).resigned || []) as number[];
     const playersInfo = rows.map((r, i) => {
-      const s = Array.from(PLAYER_SEAT.values()).find(x => x.tid === seatInfo.tid && x.pindex === i);
+      const atSeat = seatAt(seatInfo.tid, i);
+      const s = atSeat ? atSeat.seat : null;
       const seatProfile: any = s ? (s as any).profile : null;
       const q = quit[i];
       return {
@@ -2937,11 +3034,17 @@ export async function handle_end_or_kiken(form: Record<string, string>, ctx: any
     vlog(`[VFG] ${tag} tid=${seatInfo.tid} closed with no human seat left after the resign`);
   }
 
-  PLAYER_SEAT.delete(pcuid);
+  seatRelease(pcuid);
 
-  let seatsLeft = 0;
-  for (const s of PLAYER_SEAT.values()) if (Number(s.tid) === Number(seatInfo.tid)) seatsLeft++;
-  if (!seatsLeft) closeStampRoom(seatInfo.tid);
+  if (!seatCandidates(seatInfo.tid).length) {
+    // The last seat is gone. tids are never reused and nothing else holds a
+    // reference to this taikyoku, so the table - its cell stream, tens of KB for
+    // a played-out match - goes with it, together with the stamp backlog and the
+    // delivery cursors into it. This is the release of a normally closed match;
+    // the sweep below is the release of the ones nobody closes.
+    closeStampRoom(seatInfo.tid);
+    SHARED_TABLES.delete(seatInfo.tid);
+  }
 
   const body = mgresultXml(table, seatInfo.pindex);
   sendXml(ctx, xml_response(body));

@@ -1028,6 +1028,53 @@ export interface PlayerSeat {
   scramble?: string;
 }
 export const PLAYER_SEAT: Map<string, PlayerSeat> = new Map();
+// SEATS_BY_TID: which sessions sit at which table, an index over PLAYER_SEAT.
+// seatAt used to scan every seated session in the process once per seat per gget
+// poll, so lookup cost grew with everything the process had ever remembered. The
+// index holds session ids, never seat objects: PLAYER_SEAT stays the single owner
+// of the records (and of the profile reference each one carries), and an id whose
+// seat is gone - released, or dropped by a direct PLAYER_SEAT clear - is dropped
+// from the index on sight instead of keeping the record alive.
+// Every install/release of a seat goes through seatHold/seatRelease below; a raw
+// PLAYER_SEAT.set/delete is what lets the two maps disagree.
+const SEATS_BY_TID: Map<number, Set<string>> = new Map();
+
+export function seatHold(pcuid: string, seat: PlayerSeat): void {
+  const key = String(pcuid);
+  PLAYER_SEAT.set(key, seat);
+  // A seat is only ever aged against lastSeen; an install without one would read
+  // as "seen right now" forever through seatSeen's fallback and never be swept.
+  if (!(seat as any).lastSeen) (seat as any).lastSeen = Date.now();
+  const tid = Number(seat.tid) || 0;
+  let at = SEATS_BY_TID.get(tid);
+  if (!at) { at = new Set(); SEATS_BY_TID.set(tid, at); }
+  at.add(key);
+}
+
+export function seatRelease(pcuid: string): void {
+  const key = String(pcuid);
+  const seat = PLAYER_SEAT.get(key);
+  PLAYER_SEAT.delete(key);
+  if (!seat) return;
+  const tid = Number(seat.tid) || 0;
+  const at = SEATS_BY_TID.get(tid);
+  if (at) {
+    at.delete(key);
+    if (!at.size) SEATS_BY_TID.delete(tid);
+  }
+}
+
+export function seatCandidates(tid: number): string[] {
+  const at = SEATS_BY_TID.get(Number(tid) || 0);
+  if (!at || !at.size) return [];
+  const out: string[] = [];
+  for (const key of at) {
+    if (PLAYER_SEAT.has(key)) out.push(key);
+    else at.delete(key); // self-heal: PLAYER_SEAT is the owner of the truth
+  }
+  if (!at.size) SEATS_BY_TID.delete(Number(tid) || 0);
+  return out;
+}
 export const TABLES: Map<string, any> = new Map();
 export const SHARED_TABLES: Map<number, any> = new Map();
 export const STAMPS: Map<number, any[]> = new Map();
