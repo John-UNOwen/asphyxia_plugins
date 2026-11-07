@@ -1497,6 +1497,15 @@ export class Table {
     } else if (kind === S_CYOUKOU) {
       this._cell(K_TYOKO, `<pindex>${pindex}</pindex>`);
     } else if (kind === S_NEXT_KYOKU_READY) {
+      // A ready only answers the inter-kyoku wait the table is sitting in right now. The set is
+      // cleared when the next kyoku starts, so bounding the write to "kyoku_end" is what bounds how
+      // long an entry stays valid. Unguarded, a ready that lands while a kyoku is already running -
+      // a late reply for the previous kyoku's end, a client retrying its gpost, or the one a
+      // rejoiner's replayed KYOKUEND(end_stat=0) posts into the kyoku now in progress
+      // (ExecKyoku.cs:222-236) - is remembered and pre-answers the NEXT wait, letting one seat's
+      // ready deal a kyoku the other seats still owe a fresh ready for. The seat posts a new ready
+      // for the wait it is actually in. Mirror of the state guard on S_SUTE_PAI above.
+      if (this.state !== "kyoku_end") return;
       this.next_kyoku_ready.add(seat);
       this.advance_if_ready();
     } else if (kind === S_KIKEN) {
