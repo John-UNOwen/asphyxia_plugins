@@ -1341,11 +1341,15 @@ export class Table {
   private _end_kyoku(winners: number[], renchan: boolean | null = null, draw: boolean = false): void {
     this._score_rank_cell();
     if (renchan === null) renchan = winners.includes(this.oya);
-    // Honba is a renchan counter, not a draw counter: only a dealer-continuing kyoku (dealer
-    // agari, dealer-tenpai exhaustive draw, or an abortive draw that forces renchan) carries a
-    // stick. On any non-renchan end - a non-dealer win, or an exhaustive draw with the dealer
-    // noten, where the dealer rotates - honba resets to 0 (docs/17-ryunet-comparison.md:280-283).
-    if (renchan) this.honba += 1;
+    // Upstream fidelity, and a deliberate deviation we have NOT proven wrong. This line is the
+    // provider's own (`if (renchan || draw)`, unchanged since the plugin was vendored at
+    // 33947ac), so a dealer-noten exhaustive draw - where the dealer rotates - carries a stick
+    // into the next kyoku here, unlike standard riichi and unlike the summaries in
+    // docs/17-ryunet-comparison.md:283/451/487, which describe the rule the code does not
+    // implement. Nothing captured shows what the arcade did on a chiyuukyoku: capture/, ref/ and
+    // the savedata hold no honba sample outside the mock. Money is wire-visible either way
+    // (honba x 100/seat on tsumo, x 300/winner on ron). Revisit only with a capture.
+    if (renchan || draw) this.honba += 1;
     else this.honba = 0;
     this.advance_kyoku = !renchan;
     const last = this.kyoku_index >= this.total_kyoku - 1;
