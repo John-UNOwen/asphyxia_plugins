@@ -3495,6 +3495,10 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
     if (prev && PENDING_DRAWS.has(prev)) {
       stale.push([prev, PENDING_DRAWS.get(prev)!]);
     } else {
+      // A pointer to a draw that has already been applied, expired or been evicted is
+      // not a pending draw. Keep it and the session that walked away holds a key here
+      // for the life of the process; drop it and the index only ever describes real state.
+      if (prev) PENDING_BY_PCUID.delete(pcuid);
       const now = Date.now();
       for (const [rid, p] of PENDING_DRAWS) {
         if (now - p.at > 5 * 60 * 1000) stale.push([rid, p]);
@@ -3503,10 +3507,21 @@ export async function handle_cutin_gacha_play_draw(form: Record<string, string>,
     for (const [rid, p] of stale) {
       console.log(`[VFG] WARN previous draw req=${rid} (id=${p.gacha} rolled=${p.rolled.join(",")}) never got apply after ${Date.now() - p.at}ms — client likely froze on those results`);
       PENDING_DRAWS.delete(rid);
+      if (PENDING_BY_PCUID.get(p.pcuid) === rid) PENDING_BY_PCUID.delete(p.pcuid);
     }
     if (PENDING_DRAWS.size > 200) {
       const oldest = PENDING_DRAWS.keys().next().value as string;
+      const owner = PENDING_DRAWS.get(oldest);
       PENDING_DRAWS.delete(oldest);
+      if (owner && PENDING_BY_PCUID.get(owner.pcuid) === oldest) PENDING_BY_PCUID.delete(owner.pcuid);
+    }
+    if (PENDING_BY_PCUID.size > 200) {
+      // Derived state: the index can never legitimately outgrow the draws it points
+      // into, and a caller that draws once and never returns would otherwise leave a
+      // key behind per request. Reconciling it here is the sweep that closes that.
+      for (const [pc, rid] of Array.from(PENDING_BY_PCUID.entries())) {
+        if (!PENDING_DRAWS.has(rid)) PENDING_BY_PCUID.delete(pc);
+      }
     }
     PENDING_DRAWS.set(reqId, { at: Date.now(), pcuid, gacha: gachaId, rolled: [...rolled] });
     if (pcuid) PENDING_BY_PCUID.set(pcuid, reqId);
