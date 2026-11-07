@@ -588,6 +588,22 @@ function writeLanded(res: any): boolean {
 // (a cache refresh in get_menudata, an ack) keep ignoring it.
 export async function saveProfile(refid: string, doc: ProfileDoc): Promise<boolean> {
   const norm = normalizeRefid(refid) || normalizeRefid((doc as any).refid) || "GUEST";
+  // A refused save has to take the document back out of this process's memory,
+  // not just return false. getProfileByRefid/getProfileBySession hand handlers the
+  // cache's OWN object (the map stores the same reference it returns), so a caller
+  // that mutates the profile it was handed - saveStateOn writes states[kind] before
+  // calling here, and the dojo poll / gacha draw / login rotation all mutate the
+  // profile they resolved - has already written the refused bytes into the cached
+  // document. Skipping _cacheProfile on failure does not undo that: the cache still
+  // hands the mutated object to the next request, and the next incidental successful
+  // saveProfile of the same account (a dojo poll at aog.ts:3263, a gacha draw at
+  // :3313, a login session rotation at :1486) persists the whole document, so the
+  // refused state reaches storage after all and silently undoes the 803 the client
+  // was just given. Drop the document (and its session key) from the cache so the
+  // next reader reloads the storage truth. This is cache invalidation, not an
+  // in-place rollback: the caller may still hold this object, and only storage can
+  // say what the account actually is.
+  const _refused = (): false => { _evictProfileCache(doc); return false; };
   // Last-line write barrier: every profile document in the plugin is persisted
   // through this function (ensureProfile mints through it too), so no code path -
   // session resolver, mid lookup, state helper, core alias - can leave a byte on a
@@ -602,11 +618,11 @@ export async function saveProfile(refid: string, doc: ProfileDoc): Promise<boole
     res = await DB.Upsert(norm, { collection: "profile" }, doc);
   } catch (e: any) {
     vlog(`[VFG] profile save failed refid=${norm}: ${e && e.message ? e.message : e} (state NOT on storage)`);
-    return false;
+    return _refused();
   }
   if (!writeLanded(res)) {
     vlog(`[VFG] profile save cancelled refid=${norm}: DB.Upsert answered updated=${res ? (res as any).updated : "null"} (no core refid alias, or the core refused the write) - state NOT on storage`);
-    return false;
+    return _refused();
   }
   // Only a document storage took is an account this process may get to know.
   // Caching an unwritten one is how a login session ran entirely in memory.
