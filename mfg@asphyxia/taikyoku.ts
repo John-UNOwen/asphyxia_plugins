@@ -191,6 +191,7 @@ export class Table {
     this.humans = human_seats.map(s => s % this.seats);
     this.sute_choices = {};
     this.sute_replies = {};
+    this.pending_call = null;
     this.next_kyoku_ready = new Set();
     this.rng = new RNG(seed ?? null);
     this.total_kyoku = (mahjong as any).KYOKU_COUNT[taku] as number;
@@ -279,15 +280,16 @@ export class Table {
         this.pending_tsumo_choices = null;
       }
       this._cpu_turn(seat);
-    } else if (this.state === "call" && this.sute_choices[seat]) {
-      const choice = this.sute_choices[seat];
-      delete this.sute_choices[seat];
-      let anyHumanCanCall = false;
-      for (const h of this.humans) {
-        if (this.sute_choices[h]) { anyHumanCanCall = true; break; }
-      }
-      if (!anyHumanCanCall) this._cpu_calls(choice.discarder, choice.tile);
+    } else if (this.state === "call") {
+      // The offer this seat was holding is dropped for it and the wait is re-evaluated with the
+      // answers the other seats already sent: the gate below, not a scan of the offer set, which
+      // still counted a seat that had answered as one being waited on.
+      this.advance_if_calls_answered(seat);
     }
+    // The seat is out of the inter-kyoku wait now, whether it was in it or not: the same
+    // re-check the ready command does, so a kyoku the remaining seats were already ready for
+    // starts here rather than waiting for a ready that was sent before this seat went quiet.
+    this.advance_if_ready();
     return true;
   }
 
@@ -731,6 +733,7 @@ export class Table {
   private _after_discard(discarder: number, tile: number): void {
     this.sute_choices = {};
     this.sute_replies = {};
+    this.pending_call = null;
 
     let anyHumanCanCall = false;
 
@@ -799,6 +802,13 @@ export class Table {
       kan,
       chankan,
     };
+    // Every seat offered in one window is offered the same discard; the ron flag is what the
+    // seats that declined end up in furiten about, so it accumulates over the offers.
+    if (!this.pending_call) {
+      this.pending_call = { discarder, tile, chankan, ron };
+    } else if (ron) {
+      this.pending_call.ron = true;
+    }
     this.state = "call";
   }
 
@@ -924,6 +934,7 @@ export class Table {
     this._cell(K_KAKAN, `<pindex>${seat}</pindex><pai>${mahjong.idx_to_pai(tile)}</pai>`);
     this.sute_choices = {};
     this.sute_replies = {};
+    this.pending_call = null;
     let anyHumanCanCall = false;
 
     for (const s of this.humans) {
@@ -1358,6 +1369,25 @@ export class Table {
     this.start_kyoku();
   }
 
+  // The inter-kyoku gate: the next kyoku starts once every seat the engine still runs as a
+  // human has said it is ready. A predicate over the human seats, not a count - a seat the CPU
+  // took over keeps its next_kyoku_ready entry (only resign() drops one). This is the only
+  // place the wait is evaluated, so every side that changes the seat list comes through it:
+  // the ready command, resign(), and the two releases handle_gget makes when a seat goes quiet.
+  // Without those callers a kyoku whose last unready seat left never starts, because the other
+  // seats had already sent the ready that used to be the only thing testing the gate. With no
+  // human seat left it does not run the match out by itself - an exit that leaves no human seat
+  // closes the table - so it waits for a player. True when it started a kyoku.
+  advance_if_ready(): boolean {
+    if (this.state !== "kyoku_end") return false;
+    if (!this.humans.length) return false;
+    for (const h of this.humans) {
+      if (!this.next_kyoku_ready.has(Number(h))) return false;
+    }
+    this.next_kyoku();
+    return true;
+  }
+
   // client commands
   on_command(kind: number, pindex: number, pai: number, tepai_id: number, tepai_id2: number, reach: number, tsumogiri: number): void {
     const seat = pindex;
@@ -1419,9 +1449,7 @@ export class Table {
       this._cell(K_TYOKO, `<pindex>${pindex}</pindex>`);
     } else if (kind === S_NEXT_KYOKU_READY) {
       this.next_kyoku_ready.add(seat);
-      if (this.next_kyoku_ready.size === this.humans.length) {
-        this.next_kyoku();
-      }
+      this.advance_if_ready();
     } else if (kind === S_KIKEN) {
       this.resign(seat);
     }
@@ -1445,36 +1473,54 @@ export class Table {
     }
   }
 
+  // The call-window gate: the offer on a discard resolves once every seat the engine still runs
+  // as a human has answered it. `sute_choices` is the set of seats still owed an answer - an entry
+  // is dropped by the reply that answers it, and by the release of a seat that never will - so the
+  // wait is a predicate over that set, not a count of replies that only the reply path can complete.
+  // `quiet_seat` is a seat its caller has just taken out of the human list: `resign()` and the two
+  // releases `handle_gget` does when a seat goes quiet. The offer it was holding is dropped for it,
+  // and so is an answer it had already given, because the CPU plays that seat from here and makes
+  // its own call. Every side that shrinks the wait has to come through here: the other seats have
+  // usually answered long before, and nothing else ever looks at the window. An unresolved one
+  // emits no further cells, so every client at the table waits mid-kyoku for the rest of the match.
+  // True when it resolved the window.
+  advance_if_calls_answered(quiet_seat?: number): boolean {
+    if (this.state !== "call" || !this.pending_call) return false;
+    if (quiet_seat !== undefined && quiet_seat !== null) {
+      const seat = Number(quiet_seat) % this.seats;
+      delete this.sute_choices[seat];
+      delete this.sute_replies[seat];
+    }
+    for (const key in this.sute_choices) {
+      if (this.humans.some((h) => Number(h) === Number(key))) return false; // still owed an answer
+    }
+    this._resolve_sute_choices();
+    return true;
+  }
+
   private _handle_sute_reply(seat: number, kind: number, pai: number, tepai_id: number, tepai_id2: number): void {
     if (!this.sute_choices[seat]) return;
 
     this.sute_replies[seat] = { kind, pai, tepai_id, tepai_id2 };
-
-    if (Object.keys(this.sute_replies).length === Object.keys(this.sute_choices).length) {
-      this._resolve_sute_choices();
-    }
+    // The answer is in, so this seat is no longer owed one: the offer goes with the reply, and
+    // the gate decides whether that was the last one.
+    delete this.sute_choices[seat];
+    this.advance_if_calls_answered();
   }
 
   private _resolve_sute_choices(): void {
-    const choices = this.sute_choices;
+    const ctx = this.pending_call;
     const replies = this.sute_replies;
+    this.pending_call = null;
     this.sute_choices = {};
     this.sute_replies = {};
 
-    let discarder = -1;
-    let tile = -1;
-    let chankan = false;
-    let hasRon = false;
+    if (!ctx) return;
 
-    for (const key in choices) {
-      discarder = choices[key].discarder;
-      tile = choices[key].tile;
-      chankan = choices[key].chankan;
-      if (choices[key].ron) hasRon = true;
-      break;
-    }
-
-    if (discarder === -1) return;
+    const discarder = ctx.discarder;
+    const tile = ctx.tile;
+    const chankan = ctx.chankan;
+    const hasRon = ctx.ron;
 
     // 1. Check for RON
     const ron_seats: number[] = [];

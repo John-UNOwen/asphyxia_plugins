@@ -2666,22 +2666,16 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
           if ((table as any).state === "discard" && (table as any).turn === h_seat) {
             (table as any)._cpu_turn(h_seat);
             (table as any).flush_pending();
-          } else if ((table as any).state === "call") {
-            if ((table as any).sute_choices && (table as any).sute_choices[h_seat]) {
-              const choice = (table as any).sute_choices[h_seat];
-              delete (table as any).sute_choices[h_seat];
-              
-              let anyHumanCanCall = false;
-              for (const rem_h of (table as any).humans) {
-                if ((table as any).sute_choices[rem_h]) {
-                  anyHumanCanCall = true;
-                  break;
-                }
-              }
-              if (!anyHumanCanCall && typeof (table as any)._cpu_calls === "function") {
-                (table as any)._cpu_calls(choice.discarder, choice.tile);
-                (table as any).flush_pending();
-              }
+          } else if ((table as any).state === "call" &&
+                     typeof (table as any).advance_if_calls_answered === "function") {
+            // The seat went quiet while an offer of the engine's was on the table for it. The
+            // engine drops that offer and re-answers the discard with whatever the other seats
+            // had already said. Its own test used to be "does any human seat still have an
+            // offer", read off a set the reply path never shrinks: a seat that had answered was
+            // still being waited on, so nothing was answered and the table stopped emitting
+            // cells for everybody.
+            if ((table as any).advance_if_calls_answered(h_seat)) {
+              (table as any).flush_pending();
             }
           }
         }
@@ -2726,6 +2720,13 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
         (table as any).humans = ((table as any).humans || []).filter((h: any) => Number(h) !== i);
         humanSeats.delete(i);
         vlog(`[VFG] gget tid=${seatInfo.tid} seat ${i} unaddressed for ${SEAT_SILENCE_MS / 1000}s, handed to CPU`);
+        // Same release as the 60 s conversion above, and this one used to have no call handling
+        // at all: an offer the engine had out for this seat was left waiting on a seat that is
+        // not a human seat any more, which is a window that never resolves.
+        if (typeof (table as any).advance_if_calls_answered === "function" &&
+            (table as any).advance_if_calls_answered(i)) {
+          (table as any).flush_pending();
+        }
         players.push(null);
         continue;
       }
@@ -2742,6 +2743,20 @@ export async function handle_gget(form: Record<string, string>, ctx: any): Promi
     }
   } else {
     players.push({ pcuid, mid: seatInfo.mid, name: seatInfo.name, profile: seatInfo.profile });
+  }
+
+  // The inter-kyoku wait is a predicate over the engine's human seats, and this poll has just
+  // been one of the things that change them: the conversion above, the sweep, or a seat handed
+  // back to the player holding it. Re-evaluate it in the same request, so a seat that stopped
+  // being waited on starts the kyoku the remaining seats were already ready for. The ready
+  // command that would otherwise have tripped it was sent while this seat still counted and
+  // the client sends it once, then only polls - which is a pleaseWait that never clears.
+  if (table && !(table as any).finished && typeof (table as any).advance_if_ready === "function") {
+    if ((table as any).advance_if_ready()) {
+      vlog(`[VFG] gget tid=${seatInfo.tid} next kyoku started on a seat release: ` +
+        `kyoku_index=${(table as any).kyoku_index} honba=${(table as any).honba} ` +
+        `humans=[${((table as any).humans || []).join(",")}]`);
+    }
   }
 
   const mwait = matchingXml(seatInfo.tid, seats, seatInfo.pindex, players as any, isMatched,
