@@ -2983,6 +2983,10 @@ export async function handle_gpost(form: Record<string, string>, ctx: any): Prom
   const tid = mustInt(parts, 2, 0);
   const kind = mustInt(parts, 6, 0);
   const claimedPindex = mustInt(parts, 3, -1);
+  // What the client believes it is answering. For a claim-window answer it is the newest choices cell
+  // in the client's buffer plus one (CommandClient.cs:242-247), which is the only thing the wire says
+  // about which offer a reply belongs to, so the engine matches a reply against the live window with it.
+  const seqNo = mustInt(parts, 5, 0);
   const pai = mustInt(parts, 9, 0);
   const tepai_id = mustInt(parts, 10, 0);
   const tepai_id2 = mustInt(parts, 11, 0);
@@ -3007,7 +3011,7 @@ export async function handle_gpost(form: Record<string, string>, ctx: any): Prom
   const start = table.cells.length;
   // The seat the server assigned at entry is authoritative over the pindex the
   // request claims (matchSeat logs the difference).
-  table.on_command(kind, seatInfo.pindex, pai, tepai_id, tepai_id2, reach, tsumogiri);
+  table.on_command(kind, seatInfo.pindex, pai, tepai_id, tepai_id2, reach, tsumogiri, seqNo);
   
   // flush if needed for certain kinds
   const S_NAKINASHI = 11, S_PON = 5, S_CHI = 6, S_MINKAN = 8, S_ANKAN = 7, S_KAKAN = 9, S_NEXT_KYOKU_READY = 15;

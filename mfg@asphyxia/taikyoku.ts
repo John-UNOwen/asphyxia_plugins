@@ -354,12 +354,48 @@ export class Table {
     return Math.max(0, Math.min(this.kyoku_start_seq, this.cells.length));
   }
 
+  // The cells that still address a seat: the SUTECHOICES cells of the window the engine is waiting
+  // on. Derived from `sute_choices`, which is the wait set itself - an offer leaves it when the seat
+  // answers, when the seat stops being a human seat, and when the window resolves - so a resolved
+  // offer has no entry here and nothing else has to remember which offers are past.
+  private _live_offer_seqs(): Set<number> {
+    const live = new Set<number>();
+    for (const key in this.sute_choices) {
+      const seq = Number(this.sute_choices[key] && this.sute_choices[key].offer_seq);
+      if (Number.isFinite(seq) && seq >= 0) live.add(seq);
+    }
+    return live;
+  }
+
+  // Publish one chunk of the log to a client.
+  //
+  // A seat rejoining a live table is pointed at the KYOKUSTART that opened the kyoku it is in, so the
+  // cells it is handed include the SUTECHOICES cells of offers it answered before it dropped - and
+  // outside a kifu replay the client answers every one of them (ExecSuteChoices.cs:74 gates only on
+  // its own pi bit, CommandClient.Reset leaves transmission on, and the action bar answers itself on
+  // a timeout). A wire reply carries no offer identity: NAKINASHI and RON_AGARI name no tile at all
+  // (Tsugi.cs, Ron.cs set Kind and nothing else), and the seqNo a call-window answer carries names
+  // the newest choices cell in the client's buffer, not the one it is answering
+  // (CommandClient.cs:242-247). So the engine cannot tell such a reply from a live one - and the only
+  // place it still can is the one that hands the offer out. A seat is addressed by an offer exactly
+  // when the engine is still waiting on that seat for that window, so a resolved offer travels inert:
+  // the cell stays where the log put it (the client walks its cells in order and the log is what the
+  // kifu saves), with its pi bits cleared.
+  private _publish(chunk: string[]): string[] {
+    const live = this._live_offer_seqs();
+    return chunk.map((cell) => {
+      const tag = /^<cell_data_(\d+) kind="(\d+)"[^>]*>/.exec(cell);
+      if (!tag || Number(tag[2]) !== K_SUTECHOICES || live.has(Number(tag[1]))) return cell;
+      return tag[0].replace(/(pi[0-3]=")1(")/g, "$10$2") + cell.slice(tag[0].length);
+    });
+  }
+
   cells_from(start: number): string {
     if (start < 0) start = 0;
     if (start >= this.cells.length) {
       return '<taikyoku><cell_info available="0" /></taikyoku>';
     }
-    const chunk = this.cells.slice(start);
+    const chunk = this._publish(this.cells.slice(start));
     return (
       "<taikyoku>" +
       '<cell_info available="1">' +
@@ -792,6 +828,10 @@ export class Table {
       inner += _ints("kan_pai", [mahjong.idx_to_pai(tile)]);
       inner += _ints("kan_type", [2]);
     }
+    // The seq this offer is published under. It is what makes the offer nameable: the stream clears
+    // the pi bits of a SUTECHOICES cell that is not one of the live window's (see _publish), and a
+    // reply's seqNo is checked against the same number (_answers_live_offer).
+    const offer_seq = this.cells.length;
     this._cell(K_SUTECHOICES, inner, [target_seat]);
     this.sute_choices[target_seat] = {
       discarder,
@@ -801,6 +841,7 @@ export class Table {
       chi,
       kan,
       chankan,
+      offer_seq,
     };
     // Every seat offered in one window is offered the same discard; the ron flag is what the
     // seats that declined end up in furiten about, so it accumulates over the offers.
@@ -1393,16 +1434,20 @@ export class Table {
   }
 
   // client commands
-  on_command(kind: number, pindex: number, pai: number, tepai_id: number, tepai_id2: number, reach: number, tsumogiri: number): void {
+  // `seqNo` is must-slot 6 of the gpost that carried the command (GPost.cs:44). It is optional
+  // because it is a claim about which choices cell the client is answering, and only the transport
+  // that reads the wire has it; a caller that drives the engine directly leaves it unknown, which is
+  // what the CPU and the offline suites do.
+  on_command(kind: number, pindex: number, pai: number, tepai_id: number, tepai_id2: number, reach: number, tsumogiri: number, seqNo?: number): void {
     const seat = pindex;
     try {
-      this._dispatch(kind, seat, pindex, pai, tepai_id, tepai_id2, reach, tsumogiri);
+      this._dispatch(kind, seat, pindex, pai, tepai_id, tepai_id2, reach, tsumogiri, seqNo);
     } catch (_e) {
       // log exception omitted
     }
   }
 
-  private _dispatch(kind: number, seat: number, pindex: number, pai: number, tepai_id: number, tepai_id2: number, reach: number, tsumogiri: number): void {
+  private _dispatch(kind: number, seat: number, pindex: number, pai: number, tepai_id: number, tepai_id2: number, reach: number, tsumogiri: number, seqNo?: number): void {
     if (kind === S_SUTE_PAI) {
       if (this.state === "kyoku_end" || this.state === "game_end") return;
       if (this.hands[seat].length % 3 !== 2) return;
@@ -1421,13 +1466,13 @@ export class Table {
       }
       this._apply_tsumo(seat, drawn as number, res);
     } else if (kind === S_RON_AGARI) {
-      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2);
+      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2, seqNo);
     } else if (kind === S_PON) {
-      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2);
+      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2, seqNo);
     } else if (kind === S_CHI) {
-      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2);
+      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2, seqNo);
     } else if (kind === S_MINKAN) {
-      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2);
+      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2, seqNo);
     } else if (kind === S_ANKAN) {
       this.pending_tsumo_choices = null;
       const tile = mahjong.pai_to_idx(pai);
@@ -1448,7 +1493,7 @@ export class Table {
       this.pending_tsumo_choices = null;
       this._ryuukyoku(true);
     } else if (kind === S_NAKINASHI) {
-      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2);
+      this._handle_sute_reply(seat, kind, pai, tepai_id, tepai_id2, seqNo);
     } else if (kind === S_CYOUKOU) {
       this._cell(K_TYOKO, `<pindex>${pindex}</pindex>`);
     } else if (kind === S_NEXT_KYOKU_READY) {
@@ -1502,8 +1547,56 @@ export class Table {
     return true;
   }
 
-  private _handle_sute_reply(seat: number, kind: number, pai: number, tepai_id: number, tepai_id2: number): void {
+  // Is this reply an answer to the window the engine has open, or does it name another discard?
+  //
+  // The reply path used to key on the seat alone. That is only safe while a seat's next reply can
+  // belong to one window, and a rejoin breaks that: the entry cursor hands the seat the whole kyoku it
+  // is in, so the client re-executes offers it answered before it dropped and posts a fresh reply for
+  // each of them while a different window is live. What the wire still carries is checked here; what
+  // it does not carry cannot be recovered (see _publish for why the offer is therefore also published
+  // inert):
+  //   - seqNo: a call-window answer names "the newest choices cell in my buffer + 1"
+  //     (CommandClient.cs:242-247, docs/15 §5.5). A number below the live window's own cell means this
+  //     client has not been shown the discard this window is about, so the reply is not about it.
+  //   - the tiles: a PON/CHI/MINKAN carries the tile it calls (pai_id) and the two tiles it spends
+  //     from its hand (tepai_id, tepai_id2), both read off the choices cell the client was answering
+  //     (ExecSuteChoices.cs:142, :200, :219). A call built from another offer's ids would otherwise
+  //     meld a triplet of the live tile while deleting the tiles the seat never called with.
+  // Refusing is the safe direction. The window keeps the seat's offer, so the seat still owes a real
+  // answer, and every way that wait is already shrunk still applies: the client answers the live cell
+  // when it reaches it, a seat that goes quiet is converted by handle_gget, a resign drives the gate.
+  private _answers_live_offer(seat: number, kind: number, pai: number, tepai_id: number, tepai_id2: number, seqNo?: number): boolean {
+    const ctx = this.pending_call;
+    if (!ctx) return false;
+
+    if (seqNo !== undefined && seqNo > 0) {
+      let floor = -1;
+      for (const seq of this._live_offer_seqs()) floor = floor < 0 ? seq : Math.min(floor, seq);
+      if (floor >= 0 && seqNo - 1 < floor) return false;
+    }
+
+    if (kind === S_PON || kind === S_CHI || kind === S_MINKAN) {
+      const claimed = mahjong.pai_to_idx(pai);
+      if (claimed >= 0 && claimed !== ctx.tile) return false;
+    }
+    if (kind === S_PON) {
+      const own = [mahjong.pai_to_idx(tepai_id), mahjong.pai_to_idx(tepai_id2)];
+      // A pon names the two tiles it spends, and the engine's own offer only ever proposes the pair of
+      // the discard this window is about. Ids from another offer would be deleted from the hand while
+      // the meld is built from the live tile. A reply that names no ids keeps the fallback the resolve
+      // path has always had.
+      if (own.every((o) => o >= 0) &&
+          (own.some((o) => o !== ctx.tile) || !this._pon_options(seat, ctx.tile).length)) return false;
+    }
+    return true;
+  }
+
+  private _handle_sute_reply(seat: number, kind: number, pai: number, tepai_id: number, tepai_id2: number, seqNo?: number): void {
     if (!this.sute_choices[seat]) return;
+    // The seat being owed an answer is necessary and not sufficient: it says nothing about which
+    // discard the answer is about, and a seat that is behind the live edge has old offers of its own
+    // on its screen.
+    if (!this._answers_live_offer(seat, kind, pai, tepai_id, tepai_id2, seqNo)) return;
 
     this.sute_replies[seat] = { kind, pai, tepai_id, tepai_id2 };
     // The answer is in, so this seat is no longer owed one: the offer goes with the reply, and
