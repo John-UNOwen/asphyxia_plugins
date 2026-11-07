@@ -142,9 +142,22 @@ export class Table {
   completed: boolean;
   advance_kyoku: boolean;
   nokori_start: number;
+  // The seq of the KYOKUSTART cell that opened the kyoku being played - the cursor a
+  // seat rejoining this table has to be pointed at. The client executes the cells it
+  // is handed in order, and KYOKUSTART is the only cell that initialises a kyoku
+  // (ExecKyoku.ProcessCommandKyokuStart), so a rejoin cursor that lands anywhere else
+  // leaves it executing a discard with no kyoku on the table. Answering 0 instead
+  // re-streams the whole match, where every replayed KYOKUEND(end_stat=0) makes the
+  // client post a live NEXT_KYOKU_READY (ExecKyoku.cs:222-236) into a table that has
+  // already moved past it.
+  kyoku_start_seq: number;
 
   sute_choices: Record<number, any>;
   sute_replies: Record<number, any>;
+  // The discard an open call window is an answer about. Kept apart from the per-seat offers,
+  // because an offer is dropped the moment its seat answers (or stops being a human seat) and the
+  // window still has to resolve on the tile it was opened with.
+  pending_call: { discarder: number; tile: number; chankan: boolean; ron: boolean } | null;
   next_kyoku_ready: Set<number>;
 
   hands: number[][];
@@ -197,6 +210,7 @@ export class Table {
     this.completed = false;
     this.advance_kyoku = true;
     this.nokori_start = 0;
+    this.kyoku_start_seq = 0;
     // init kyoku state fields to satisfy TS definite assignment
     this.hands = [[], [], [], []];
     this.melds = [[], [], [], []];
@@ -330,6 +344,14 @@ export class Table {
     this.cells.push(`<cell_data_${seq} kind="${kind}"${flags}>${inner}</cell_data_${seq}>`);
   }
 
+  // The cursor to tell a seat rejoining this table to resume from: the seq this
+  // table opened the kyoku it is now in. A table that has not dealt one yet opened
+  // kyoku 0 at seq 0, so a first entry - including the entry_game that forms the
+  // table around the last seat of a lobby - is answered 0 exactly as before.
+  resume_seq(): number {
+    return Math.max(0, Math.min(this.kyoku_start_seq, this.cells.length));
+  }
+
   cells_from(start: number): string {
     if (start < 0) start = 0;
     if (start >= this.cells.length) {
@@ -409,6 +431,7 @@ export class Table {
         `<rank>${rank}</rank>` +
         `</player_info${i}>`;
     }
+    this.kyoku_start_seq = this.cells.length;
     this._cell(K_KYOKUSTART, inner);
     // log omitted
     this._begin_turn(this.oya);

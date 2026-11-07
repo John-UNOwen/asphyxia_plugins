@@ -226,12 +226,24 @@ function entryXml(ctx: any, tid: number, pindex: number, gmode: number): string 
   const limits = Object.keys(ENTRY_LIMIT_SECONDS)
     .map(k => `<${k}>${ENTRY_LIMIT_SECONDS[k]}</${k}>`)
     .join("");
+  // <next_sno> is the cell cursor the client starts streaming at: MatchingFlow.cs:218
+  // seeds CommandClient.Reset with it (EntryTakuInfo.cs:52) and every later gget
+  // carries it back, which handle_gget answers from table.cells_from. So it belongs to
+  // the table this answer describes, and a constant cannot be right for all three
+  // places that build one. Rejoining a live table with 0 re-streams the whole match,
+  // and each replayed KYOKUEND(end_stat=0) makes ExecKyoku post a live
+  // NEXT_KYOKU_READY (ExecKyoku.cs:222-236): the returning seat pre-answers an
+  // inter-kyoku wait the table is not in yet, and the next kyoku is dealt while that
+  // client is still executing cells from before it left. A table that has not dealt a
+  // kyoku yet sits at 0, so a fresh entry keeps its old answer.
+  const live = SHARED_TABLES.get(Number(tid) || 0);
+  const next_sno = live && typeof live.resume_seq === "function" ? Number(live.resume_seq()) || 0 : 0;
   return xml_response(
     "<entry>" +
     "<gserv_id>1</gserv_id>" +
     `<tid>${tid}</tid>` +
     `<pindex>${pindex}</pindex>` +
-    "<next_sno>0</next_sno>" +
+    `<next_sno>${next_sno}</next_sno>` +
     "<last_cyoukou_num>3</last_cyoukou_num>" +
     "<cyoukou_num>3</cyoukou_num>" +
     limits +
