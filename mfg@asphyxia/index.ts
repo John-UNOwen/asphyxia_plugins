@@ -11,7 +11,7 @@ declare const Buffer: any;
 
 import { registerEamuseRoutes } from "./handlers/eamuse";
 import { registerAogRoutes, AOG_HANDLER_MAP, extractAogName, handleAogUnhandled, aogAnswered, aogEmptySuccess } from "./handlers/aog";
-import { vlog, quarantinePhantomProfiles, accountAuthPolicy, accountAuthDefaults } from "./handlers/utils";
+import { vlog, quarantinePhantomProfiles, accountAuthPolicy, accountAuthDefaults, xml_error, SERV_ST_STATE_INVALID } from "./handlers/utils";
 
 export function register(): void {
   R.GameCode("VFG");
@@ -338,13 +338,64 @@ export function register(): void {
       return wrapper;
     }
 
+    // Same bound as the core's AOG middleware (src/middlewares/AogMiddleware.ts):
+    // this server has no body parser in front of it either, so an unbounded
+    // accumulator lets one client pin as much memory as it can send.
+    const MAX_NATIVE_BODY_BYTES = 1 * 1024 * 1024;
+
+    function rejectNativeBody(req: any, res: any, why: string): void {
+      try { vlog(`[VFG-NATIVE] ${req.url} rejected: ${why} (limit ${MAX_NATIVE_BODY_BYTES} bytes)`); } catch {}
+      try {
+        if (!res.headersSent && !res.writableEnded) {
+          res.writeHead(413, { 'Content-Type': 'text/xml; charset=utf-8' });
+          res.end(xml_error(SERV_ST_STATE_INVALID));
+        }
+      } catch {}
+      // Drain what the client keeps sending rather than buffering it; destroying the
+      // socket here can eat the answer just written.
+      try { req.resume(); } catch {}
+    }
+
     const server = http.createServer((req: any, res: any) => {
+      // Reject a declared body that cannot fit the cap before reading it at all.
+      const declared = Number(req.headers['content-length']);
+      if (Number.isFinite(declared) && declared > MAX_NATIVE_BODY_BYTES) {
+        rejectNativeBody(req, res, 'declared body over limit');
+        return;
+      }
       let body = '';
-      req.on('data', (chunk: any) => { body += chunk.toString(); });
+      let total = 0;
+      let settled = false; // end / error / aborted / close: the first of them owns the request
+      req.on('data', (chunk: any) => {
+        if (settled) return;
+        total += typeof chunk === 'string' ? Buffer.byteLength(chunk, 'utf8') : chunk.length;
+        if (total > MAX_NATIVE_BODY_BYTES) {
+          settled = true;
+          body = ''; // the oversized body is worthless the moment it is found
+          rejectNativeBody(req, res, 'body over limit');
+          return;
+        }
+        body += chunk.toString();
+      });
+      const dropNative = (why: string) => {
+        if (settled) return;
+        settled = true;
+        body = ''; // a half-sent body must not stay reachable behind dead listeners
+        try { vlog(`[VFG-NATIVE] ${req.url} dropped (${why}, ${total} bytes buffered) — client gone, no response`); } catch {}
+      };
+      // A client that disappears mid-body fires 'aborted'/'close' (and sometimes
+      // 'error') and never 'end': with only 'data'/'end' registered the request was
+      // never answered, never logged, and its bytes stayed referenced.
+      req.on('error', (e: any) => dropNative(`request error ${e && e.code ? e.code : e}`));
+      req.on('aborted', () => dropNative('client aborted mid-body'));
+      req.on('close', () => { if (!req.complete) dropNative('socket closed before the body ended'); });
       req.on('end', async () => {
+        if (settled) return;
+        settled = true;
         const url = (req.url || '/').split('?')[0];
         const clean = url.replace(/\/\//g, '/');
         const params = parseFormNative(body);
+        body = ''; // the parsed form is all that is needed from here on
         try {
           const u = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
           for (const [k,v] of u.searchParams.entries()) if (!(k in params)) params[k]=v;
